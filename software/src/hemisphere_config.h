@@ -91,6 +91,7 @@ class_name class_name ## _instance[2]
 #include "applets/Squanch.h"
 #include "applets/Stairs.h"
 #include "applets/Switch.h"
+#include "applets/SwitchSeq.h"
 #include "applets/TB3PO.h"
 #include "applets/TLNeuron.h"
 #include "applets/Trending.h"
@@ -165,6 +166,7 @@ CREATE_APPLET(Shuffle);
 CREATE_APPLET(Slew);
 CREATE_APPLET(Squanch);
 CREATE_APPLET(Switch);
+CREATE_APPLET(SwitchSeq);
 CREATE_APPLET(TLNeuron);
 CREATE_APPLET(Trending);
 CREATE_APPLET(TrigSeq);
@@ -232,6 +234,7 @@ CREATE_APPLET(VectorMorph);
     DECLARE_APPLET( 46, 0x08, Squanch), \
     DECLARE_APPLET( 61, 0x01, Stairs), \
     DECLARE_APPLET(  3, 0x10, Switch), \
+    DECLARE_APPLET(  3, 0x10, SwitchSeq), \
     DECLARE_APPLET( 60, 0x02, TB_3PO), \
     DECLARE_APPLET( 13, 0x40, TLNeuron), \
     DECLARE_APPLET( 37, 0x40, Trending), \
