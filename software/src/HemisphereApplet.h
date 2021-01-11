@@ -323,6 +323,12 @@ public:
         gfxPrint(num);
     }
 
+    template<typename... Args>
+    void gfxPrintfn(int x, int y, int n, const char *format,  Args ...args) {
+        graphics.setPrintPos(x, y);
+        graphics.printf(format, args...);
+    }
+
     /* Convert CV value to voltage level and print  to two decimal places */
     void gfxPixel(int x, int y) {
         graphics.setPixel(x + gfx_offset, y);
@@ -359,6 +365,11 @@ public:
     void gfxBitmap(int x, int y, int w, const uint8_t *data) {
         graphics.drawBitmap8(x + gfx_offset, y, w, data);
     }
+
+    void gfxBitmapBlink(int x, int y, int w, const uint8_t *data) {
+        if (CursorBlink()) gfxBitmap(x, y, w, data);
+    }
+
     void gfxIcon(int x, int y, const uint8_t *data) {
         gfxBitmap(x, y, 8, data);
     }
