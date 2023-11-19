@@ -18,138 +18,150 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-class ClockDivider : public HemisphereApplet {
+// #define HEM_CLOCKDIV_MAX 10
+
+#define HEM_INITIAL_DIVISION1 8
+#define HEM_INITIAL_DIVISION2 9
+#define HEM_DIVISIONS 16
+int divisions[] = {-8, -7, -6, -5, -4, -3, -2, 1, 2, 3, 4, 5, 6, 7, 8, 16, 32};
+
+char buffer[60];
+
+class ClockDivider : public HemisphereApplet
+{
 public:
-
-  enum ClockDivCursor {
-    CHAN_A1, CHAN_A2,
-    CHAN_B1, CHAN_B2,
-
-    LAST_SETTING = CHAN_B2
-  };
-
-    static constexpr int CLOCKDIV_MAX = 32;
-
-    struct ClkDivMult {
-      int8_t steps = 1; // positive for division, negative for multiplication
-      uint8_t clock_count = 0; // Number of clocks since last output (for clock divide)
-      uint32_t next_clock = 0; // Tick number for the next output (for clock multiply)
-      uint32_t last_clock = 0;
-      int cycle_time = 0; // Cycle time between the last two clock inputs
-
-      void Set(int s) {
-        steps = constrain(s, -CLOCKDIV_MAX, CLOCKDIV_MAX);
-      }
-      bool Tick(bool clocked = 0) {
-        if (steps == 0) return false;
-        bool trigout = 0;
-        const uint32_t this_tick = OC::CORE::ticks;
-
-        if (clocked) {
-          cycle_time = this_tick - last_clock;
-          last_clock = this_tick;
-
-          if (steps > 0) { // Positive value indicates clock division
-              clock_count++;
-              if (clock_count == 1) trigout = 1; // fire on first step
-              if (clock_count >= steps) clock_count = 0; // Reset on last step
-          }
-          if (steps < 0) {
-              // Calculate next clock for multiplication on each clock
-              int tick_interval = (cycle_time / -steps);
-              next_clock = this_tick + tick_interval;
-              clock_count = 0;
-              trigout = 1;
-          }
-        }
-
-        // Handle clock multiplication
-        if (steps < 0) {
-            if ( this_tick >= next_clock && clock_count+1 < -steps) {
-                int tick_interval = (cycle_time / -steps);
-                next_clock += tick_interval;
-                ++clock_count;
-                trigout = 1;
-            }
-        }
-        return trigout;
-      }
-      void Reset() {
-        clock_count = 0;
-        next_clock = 0;
-      }
-    } divmult[4];
-
-    const char* applet_name() {
+    const char *applet_name()
+    {
         return "Clock Div";
     }
 
-    void Start() {
-      divmult[0].steps = 2;
-      divmult[2].steps = 4;
-    }
-
-    void Controller() {
-        // Modulate setting via CV
+    void Start()
+    {
+        div[0] = HEM_INITIAL_DIVISION1;
+        div[1] = HEM_INITIAL_DIVISION2;
         ForEachChannel(ch)
         {
-          int div_m = div[ch];
-          Modulate(div_m, ch, -CLOCKDIV_MAX, CLOCKDIV_MAX);
-          divmult[ch*2].steps = div_m;
+            count[ch] = 0;
+            next_clock[ch] = 0;
         }
+        cycle_time = 0;
+        cursor = 0;
+    }
 
-        if (Clock(1)) { // Reset
-          ForEachChannel(ch) {
-            ForEachChannel(d) divmult[ch*2 + d].Reset();
-          }
-        }
+    int GetDivisionFor(int ch)
+    {
+        int dv = div[ch] + cv[ch];
+        return divisions[constrain(dv, 0, HEM_DIVISIONS)];
+    }
 
+    void Controller()
+    {
+        int this_tick = OC::CORE::ticks;
+
+        // Set division via CV
         ForEachChannel(ch)
         {
-            bool trig = divmult[ch*2 + 0].Tick( Clock(0) );
-            trig = divmult[ch*2 + 1].Tick( trig );
-            if (trig) ClockOut(ch);
+            int input = DetentedIn(ch);
+            if (input)
+            {
+                cv[ch] = Proportion(input, HEMISPHERE_MAX_CV, HEM_DIVISIONS);
+                cv[ch] = constrain(cv[ch], -HEM_DIVISIONS, HEM_DIVISIONS); // -16->+16
+            }
+        }
+
+        if (Clock(1))
+        { // Reset
+            ForEachChannel(ch) count[ch] = 0;
+        }
+
+        // The input was clocked; set timing info
+        if (Clock(0))
+        {
+            cycle_time = ClockCycleTicks(0);
+            // At the clock input, handle clock division
+            ForEachChannel(ch)
+            {
+                count[ch]++;
+                if (GetDivisionFor(ch) > 0)
+                { // Positive value indicates clock division
+                    if (count[ch] >= GetDivisionFor(ch))
+                    {
+                        count[ch] = 0; // Reset
+                        ClockOut(ch);
+                    }
+                }
+                else
+                {
+                    // Calculate next clock for multiplication on each clock
+                    int clock_every = (cycle_time / abs(GetDivisionFor(ch)));
+                    next_clock[ch] = this_tick + clock_every;
+                    ClockOut(ch); // Sync
+                }
+            }
+        }
+
+        // Handle clock multiplication
+        ForEachChannel(ch)
+        {
+            if (GetDivisionFor(ch) < 0)
+            { // Negative value indicates clock multiplication
+                if (this_tick >= next_clock[ch])
+                {
+                    int clock_every = (cycle_time / abs(GetDivisionFor(ch)));
+                    next_clock[ch] += clock_every;
+                    ClockOut(ch);
+                }
+            }
         }
     }
 
-    void View() {
+    void View()
+    {
         DrawSelector();
     }
 
-    void OnButtonPress() {
-        CursorAction(cursor, LAST_SETTING);
+    void OnButtonPress()
+    {
+        CursorAction(cursor, 1);
     }
 
-    void OnEncoderMove(int direction) {
-        if (!EditMode()) {
-            MoveCursor(cursor, direction, LAST_SETTING);
+    void OnEncoderMove(int direction)
+    {
+        if (!EditMode())
+        {
+            MoveCursor(cursor, direction, 1);
             return;
         }
 
-        if (cursor & 0x1)
-          divmult[cursor].Set( divmult[cursor].steps + direction );
-        else
-          div[cursor / 2] = constrain( div[cursor / 2] + direction, -CLOCKDIV_MAX, CLOCKDIV_MAX);
+        div[cursor] += direction;
+        if (div[cursor] > HEM_DIVISIONS)
+        {
+            div[cursor] = HEM_DIVISIONS;
+        }
+        if (div[cursor] < 0)
+        {
+            div[cursor] = 0;
+        }
+        count[cursor] = 0; // Start the count over so things aren't missed
     }
 
-    uint64_t OnDataRequest() {
+    uint64_t OnDataRequest()
+    {
         uint64_t data = 0;
-        for (size_t i = 0; i < 2; ++i) {
-          Pack(data, PackLocation {0 + i*8,8}, div[i] + 32);
-          Pack(data, PackLocation {16 + i*8,8}, divmult[1+i*2].steps + 32);
-        }
+        Pack(data, PackLocation{0, 8}, div[0] + 32);
+        Pack(data, PackLocation{8, 8}, div[1] + 32);
         return data;
     }
 
-    void OnDataReceive(uint64_t data) {
-        for (size_t i = 0; i < 2; ++i) {
-          div[i] = Unpack(data, PackLocation {0 + i*8,8}) - 32;
-          divmult[1+i*2].Set( Unpack(data, PackLocation {16 + i*8,8}) - 32 );
-        }
+    void OnDataReceive(uint64_t data)
+    {
+        div[0] = Unpack(data, PackLocation{0, 8}) - 32;
+        div[1] = Unpack(data, PackLocation{8, 8}) - 32;
     }
 
 protected:
-    void SetHelp() {
+    void SetHelp()
+    {
         help[HEMISPHERE_HELP_DIGITALS] = "1=Clock 2=Reset";
         help[HEMISPHERE_HELP_CVS] = "Div/Mult Ch1,Ch2";
         help[HEMISPHERE_HELP_OUTS] = "Clk A=Ch1 B=Ch2";
@@ -157,39 +169,32 @@ protected:
     }
 
 private:
-    int div[2] = {1, 2}; // Division setting before modulation.
-                         // Positive for divisions, negative for multipliers.
-                         // Zero is mute.
-    int cursor = 0; // Which output is currently being edited
+    int div[2] = {1, 2};        // Division data for outputs. Positive numbers are divisions, negative numbers are multipliers
+    int cv[2];                  // cv inputs (range from -16 to +16)
+    int count[2] = {0, 0};      // Number of clocks since last output (for clock divide)
+    int next_clock[2] = {0, 0}; // Tick number for the next output (for clock multiply)
+    int cursor = 0;             // Which output is currently being edited
+    int cycle_time = 0;         // Cycle time between the last two clock inputs
 
-    void DrawSelector() {
+    void DrawSelector()
+    {
         ForEachChannel(ch)
         {
-            const int y = 15 + (ch * 24);
+            int y = 15 + (ch * 25);
 
-            gfxPrint(1, y, OC::Strings::capital_letters[ch+hemisphere*2]);
-            ForEachChannel(d) {
-              const int s = divmult[ch*2 + d].steps;
-
-              gfxPos(13, y + d*12);
-              if (s > 0) {
-                  gfxPrint("/");
-                  gfxPrint(s);
-                  gfxPrint(" Div");
-              }
-              if (s < 0) {
-                  gfxPrint("x");
-                  gfxPrint(-s);
-                  gfxPrint(" Mult");
-              }
-              if (s == 0) {
-                  gfxPrint("(off)");
-              }
+            if (GetDivisionFor(ch) > 0)
+            {
+                gfxPrint(1, y, "/");
+                gfxPrint(GetDivisionFor(ch));
+                gfxPrint(" Div");
             }
-
-            if (divmult[ch*2].steps != div[ch]) gfxIcon(18, y+8, CV_ICON);
+            if (GetDivisionFor(ch) < 0)
+            {
+                gfxPrint(1, y, "x");
+                gfxPrint(abs(GetDivisionFor(ch)));
+                gfxPrint(" Mult");
+            }
         }
-        gfxCursor(12, 23 + (cursor * 12), 50);
-        gfxDottedLine(1, 36, 63, 36); // to separate the two channels
+        gfxCursor(0, 23 + (cursor * 25), 63);
     }
 };
