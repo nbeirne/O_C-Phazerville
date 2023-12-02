@@ -90,6 +90,7 @@ class_name class_name ## _instance[2]
 #include "applets/Slew.h"
 #include "applets/Squanch.h"
 #include "applets/Stairs.h"
+#include "applets/Strum.h"
 #include "applets/Switch.h"
 #include "applets/TB3PO.h"
 #include "applets/TLNeuron.h"
@@ -123,6 +124,7 @@ CREATE_APPLET(Voltage);
 CREATE_APPLET(Calibr8);
 CREATE_APPLET(DivSeq);
 CREATE_APPLET(PolyDiv);
+CREATE_APPLET(Strum);
 
 CREATE_APPLET(ASR);
 CREATE_APPLET(Binary);
@@ -232,6 +234,7 @@ CREATE_APPLET(VectorMorph);
     DECLARE_APPLET( 19, 0x01, Slew), \
     DECLARE_APPLET( 46, 0x08, Squanch), \
     DECLARE_APPLET( 61, 0x01, Stairs), \
+    DECLARE_APPLET( 74, 0x08, Strum), \
     DECLARE_APPLET(  3, 0x10, Switch), \
     DECLARE_APPLET( 60, 0x02, TB_3PO), \
     DECLARE_APPLET( 13, 0x40, TLNeuron), \
