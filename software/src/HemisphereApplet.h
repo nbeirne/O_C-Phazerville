@@ -212,9 +212,11 @@ public:
     }
 
     void SmoothedOut(int ch, int value, int kSmoothing) {
+      if (OC::CORE::ticks % kSmoothing == 0) {
         DAC_CHANNEL channel = (DAC_CHANNEL)(ch + io_offset);
         value = (frame.outputs_smooth[channel] * (kSmoothing - 1) + value) / kSmoothing;
         frame.outputs[channel] = frame.outputs_smooth[channel] = value;
+      }
     }
     void ClockOut(const int ch, const int ticks = HEMISPHERE_CLOCK_TICKS * trig_length) {
         frame.ClockOut( (DAC_CHANNEL)(io_offset + ch), ticks);
@@ -228,7 +230,11 @@ public:
     braids::Quantizer* GetQuantizer(int ch) {
         return &HS::quantizer[io_offset + ch];
     }
-    int Quantize(int ch, int cv, int root, int transpose) {
+    int GetLatestNoteNumber(int ch) {
+      return HS::quantizer[io_offset + ch].GetLatestNoteNumber();
+    }
+    int Quantize(int ch, int cv, int root = 0, int transpose = 0) {
+        if (root == 0) root = (HS::root_note[io_offset + ch] << 7);
         return HS::quantizer[io_offset + ch].Process(cv, root, transpose);
     }
     int QuantizerLookup(int ch, int note) {
