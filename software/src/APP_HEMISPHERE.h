@@ -107,13 +107,18 @@ public:
 
     // returns true if changed
     bool StoreInputMap() {
+      uint16_t cvmap = 0;
       uint16_t trigmap = 0;
       for (size_t i = 0; i < 4; ++i) {
         trigmap |= (uint16_t(HS::trigger_mapping[i] + 1) & 0x0F) << (i*4);
+        cvmap |= (uint16_t(HS::cvmapping[i] + 1) & 0x0F) << (i*4);
       }
 
-      bool changed = (uint16_t(values_[HEMISPHERE_TRIGMAP]) != trigmap);
+      bool changed = (uint16_t(values_[HEMISPHERE_TRIGMAP]) != trigmap)
+                   || (uint16_t(values_[HEMISPHERE_CVMAP]) != cvmap);
       apply_value(HEMISPHERE_TRIGMAP, trigmap);
+      apply_value(HEMISPHERE_CVMAP, cvmap);
+
       return changed;
     }
     void LoadInputMap() {
@@ -121,6 +126,10 @@ public:
         int val = (uint16_t(values_[HEMISPHERE_TRIGMAP]) >> (i*4)) & 0x0F;
         if (val != 0)
           HS::trigger_mapping[i] = constrain(val - 1, 0, 4);
+
+        val = (uint16_t(values_[HEMISPHERE_CVMAP]) >> (i*4)) & 0x0F;
+        if (val != 0)
+          HS::cvmapping[i] = constrain(val - 1, 0, 4);
       }
     }
 
@@ -750,7 +759,9 @@ private:
         SCREENSAVER_MODE,
         CURSOR_MODE,
 
-        MAX_CURSOR = CURSOR_MODE
+        CVMAP1, CVMAP2, CVMAP3, CVMAP4,
+
+        MAX_CURSOR = CVMAP4
     };
 
     void ConfigEncoderAction(int h, int dir) {
@@ -762,6 +773,12 @@ private:
         }
 
         switch (config_cursor) {
+        case CVMAP1:
+        case CVMAP2:
+        case CVMAP3:
+        case CVMAP4:
+            HS::cvmapping[config_cursor-CVMAP1] = constrain( HS::cvmapping[config_cursor-CVMAP1] + dir, 0, 4);
+            break;
         case TRIG_LENGTH:
             HS::trig_length = (uint32_t) constrain( int(HS::trig_length + dir), 1, 127);
             break;
@@ -802,6 +819,10 @@ private:
             HS::auto_save_enabled = !HS::auto_save_enabled;
             break;
 
+        case CVMAP1:
+        case CVMAP2:
+        case CVMAP3:
+        case CVMAP4:
         case TRIG_LENGTH:
             isEditing = !isEditing;
             break;
@@ -837,8 +858,21 @@ private:
         const char * cursor_mode_name[3] = { "modal", "modal+wrap" };
         gfxPrint(1, 35, "Cursor:  ");
         gfxPrint(cursor_mode_name[HS::cursor_wrap]);
-        
+
+        // Physical CV input mappings
+        for (int ch=0; ch<4; ++ch) {
+          gfxPrint(1 + ch*32, 55, OC::Strings::cv_input_names_none[ HS::cvmapping[ch] ] );
+        }
+
         switch (config_cursor) {
+        case CVMAP1:
+        case CVMAP2:
+        case CVMAP3:
+        case CVMAP4:
+          if (isEditing) gfxInvert(32*(config_cursor-CVMAP1), 54, 20, 9);
+          else gfxCursor(1 + 32*(config_cursor - CVMAP1), 63, 19);
+          break;
+
         case TRIG_LENGTH:
             if (isEditing) gfxInvert(79, 14, 25, 9);
             else gfxCursor(80, 23, 24);
