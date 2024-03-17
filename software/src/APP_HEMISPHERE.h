@@ -451,10 +451,10 @@ public:
           break;
         case CLOCK_POPUP:
           graphics.print("Clock ");
-          if (clock_m->IsRunning())
+          if (HS::clock_m.IsRunning())
             graphics.print("Start");
           else
-            graphics.print(clock_m->IsPaused() ? "Armed" : "Stop");
+            graphics.print(HS::clock_m.IsPaused() ? "Armed" : "Stop");
           break;
 
         case PRESET_POPUP:
@@ -503,10 +503,10 @@ public:
                 HS::available_applets[index].instance[h]->BaseView();
             }
 
-            if (clock_m->IsRunning()) {
+            if (HS::clock_m.IsRunning()) {
                 // Metronome icon
-                gfxIcon(56, 1, clock_m->Cycle() ? METRO_L_ICON : METRO_R_ICON);
-            } else if (clock_m->IsPaused()) {
+                gfxIcon(56, 1, HS::clock_m.Cycle() ? METRO_L_ICON : METRO_R_ICON);
+            } else if (HS::clock_m.IsPaused()) {
                 gfxIcon(56, 1, PAUSE_ICON);
             }
 
@@ -666,11 +666,11 @@ public:
     }
 
     void ToggleClockRun() {
-        if (clock_m->IsRunning()) {
-            clock_m->Stop();
+        if (HS::clock_m.IsRunning()) {
+            HS::clock_m.Stop();
         } else {
-            bool p = clock_m->IsPaused();
-            clock_m->Start( !p );
+            bool p = HS::clock_m.IsPaused();
+            HS::clock_m.Start( !p );
         }
         PokePopup(CLOCK_POPUP);
     }
@@ -749,7 +749,6 @@ private:
     uint32_t popup_tick; // for button feedback
     PopupType popup_type = PRESET_POPUP;
     int first_click; // The first button pushed of a double-click set, to see if the same one is pressed
-    ClockManager *clock_m = clock_m->get();
 
     enum HEMConfigCursor {
         LOAD_PRESET, SAVE_PRESET,
