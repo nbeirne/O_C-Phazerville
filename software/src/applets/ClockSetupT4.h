@@ -1,4 +1,5 @@
 // Copyright (c) 2018, Jason Justian
+// Copyright (c) 2024, Nicholas J. Michalek
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -86,6 +87,9 @@ public:
         if (HS::clock_m.IsRunning() && HS::clock_m.MIDITock()) {
           usbMIDI.sendRealTime(usbMIDI.Clock);
           usbHostMIDI.sendRealTime(usbMIDI.Clock);
+#ifdef ARDUINO_TEENSY41
+          MIDI1.sendRealTime(midi::MidiType(usbMIDI.Clock));
+#endif
         }
 
         // 8 internal clock flashers
