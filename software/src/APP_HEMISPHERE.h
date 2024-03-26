@@ -580,6 +580,7 @@ public:
         }
     }
 
+#ifdef ARDUINO_TEENSY41
     void ExtraButtonPush(const UI::Event &event) {
         bool down = (event.type == UI::EVENT_BUTTON_DOWN);
         if (down) return;
@@ -607,6 +608,8 @@ public:
             ShowPresetSelector();
 
     }
+#endif
+
     void DelegateSelectButtonPush(const UI::Event &event) {
         bool down = (event.type == UI::EVENT_BUTTON_DOWN);
         const int hemisphere = (event.control == OC::CONTROL_BUTTON_UP) ? LEFT_HEMISPHERE : RIGHT_HEMISPHERE;
@@ -876,7 +879,7 @@ private:
         gfxPrint(HS::trig_length);
         gfxPrint("ms");
 
-        const char * ssmodes[4] = { "[blank]", "Meters", "Zaps",
+        const char * const ssmodes[4] = { "[blank]", "Meters", "Zaps",
         #if defined(__IMXRT1062__)
         "Stars"
         #else
@@ -886,7 +889,7 @@ private:
         gfxPrint(1, 25, "Screensaver:  ");
         gfxPrint( ssmodes[HS::screensaver_mode] );
 
-        const char * cursor_mode_name[3] = { "modal", "modal+wrap" };
+        const char * const cursor_mode_name[3] = { "modal", "modal+wrap" };
         gfxPrint(1, 35, "Cursor:  ");
         gfxPrint(cursor_mode_name[HS::cursor_wrap]);
 
