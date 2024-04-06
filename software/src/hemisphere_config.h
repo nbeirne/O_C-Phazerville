@@ -71,6 +71,7 @@ class_name class_name ## _instance[2]
 #include "applets/LowerRenz.h"
 #include "applets/Metronome.h"
 #include "applets/MixerBal.h"
+#include "applets/Noise.h"
 #include "applets/MultiScale.h"
 #include "applets/Palimpsest.h"
 #include "applets/Pigeons.h"
@@ -149,6 +150,7 @@ CREATE_APPLET(Logic);
 CREATE_APPLET(LowerRenz);
 CREATE_APPLET(Metronome);
 CREATE_APPLET(MixerBal);
+CREATE_APPLET(Noise);
 CREATE_APPLET(MultiScale);
 CREATE_APPLET(Palimpsest);
 CREATE_APPLET(ProbabilityDivider);
@@ -214,6 +216,7 @@ CREATE_APPLET(VectorMorph);
     DECLARE_APPLET(150, 0x20, hMIDIIn), \
     DECLARE_APPLET( 27, 0x20, hMIDIOut), \
     DECLARE_APPLET( 33, 0x10, MixerBal), \
+    DECLARE_APPLET( 66, 0x01, Noise), \
     DECLARE_APPLET( 73, 0x08, MultiScale), \
     DECLARE_APPLET( 20, 0x02, Palimpsest), \
     DECLARE_APPLET( 71, 0x02, Pigeons), \
