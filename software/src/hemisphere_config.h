@@ -66,7 +66,7 @@ class_name class_name ## _instance[2]
 #include "applets/GameOfLife.h"
 #include "applets/GateDelay.h"
 #include "applets/GatedVCA.h"
-#include "applets/LoFiPCM.h"
+#include "applets/DrLoFi.h"
 #include "applets/Logic.h"
 #include "applets/LowerRenz.h"
 #include "applets/Metronome.h"
@@ -146,7 +146,7 @@ CREATE_APPLET(EnvFollow);
 CREATE_APPLET(GameOfLife);
 CREATE_APPLET(GateDelay);
 CREATE_APPLET(GatedVCA);
-CREATE_APPLET(LoFiPCM);
+CREATE_APPLET(DrLoFi);
 CREATE_APPLET(Logic);
 CREATE_APPLET(LowerRenz);
 CREATE_APPLET(Metronome);
@@ -200,6 +200,7 @@ CREATE_APPLET(VectorMorph);
     DECLARE_APPLET( 30, 0x10, Compare), \
     DECLARE_APPLET( 24, 0x02, CVRecV2), \
     DECLARE_APPLET( 68, 0x06, DivSeq), \
+    DECLARE_APPLET( 16, 0x80, DrLoFi), \
     DECLARE_APPLET( 57, 0x02, DrumMap), \
     DECLARE_APPLET(  9, 0x08, DualQuant), \
     DECLARE_APPLET( 18, 0x02, DualTM), \
@@ -210,7 +211,6 @@ CREATE_APPLET(VectorMorph);
     DECLARE_APPLET( 22, 0x01, GameOfLife), \
     DECLARE_APPLET( 29, 0x04, GateDelay), \
     DECLARE_APPLET( 17, 0x50, GatedVCA), \
-    DECLARE_APPLET( 16, 0x80, LoFiPCM), \
     DECLARE_APPLET( 10, 0x44, Logic), \
     DECLARE_APPLET( 21, 0x01, LowerRenz), \
     DECLARE_APPLET( 50, 0x04, Metronome), \

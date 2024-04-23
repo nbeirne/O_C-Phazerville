@@ -29,12 +29,12 @@
 
 uint8_t lofi_pcm_buffer[HEM_LOFI_PCM_BUFFER_SIZE];
 
-class LoFiPCM : public HemisphereApplet {
+class DrLoFi : public HemisphereApplet {
 public:
     const int length = HEM_LOFI_PCM_BUFFER_SIZE;
 
     const char* applet_name() { // Maximum 10 characters
-        return "LoFi Echo";
+        return "Dr. LoFi";
     }
 
     void Start() {
