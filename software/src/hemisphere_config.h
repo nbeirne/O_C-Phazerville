@@ -260,6 +260,14 @@ namespace HS {
   static constexpr Applet available_applets[] = HEMISPHERE_APPLETS;
   static constexpr int HEMISPHERE_AVAILABLE_APPLETS = ARRAY_SIZE(available_applets);
 
+  uint64_t hidden_applets = 0;
+  bool applet_is_hidden(const int& index) {
+    return (hidden_applets >> index) & 1;
+  }
+  void showhide_applet(const int& index) {
+    hidden_applets = hidden_applets ^ (uint64_t(1) << index);
+  }
+
   constexpr int get_applet_index_by_id(const int& id) {
     int index = 0;
     for (int i = 0; i < HEMISPHERE_AVAILABLE_APPLETS; i++)
@@ -269,11 +277,13 @@ namespace HS {
     return index;
   }
 
-  constexpr int get_next_applet_index(int index, const int dir) {
+  int get_next_applet_index(int index, const int dir) {
+    do {
       index += dir;
       if (index >= HEMISPHERE_AVAILABLE_APPLETS) index = 0;
       if (index < 0) index = HEMISPHERE_AVAILABLE_APPLETS - 1;
+    } while (applet_is_hidden(index));
 
-      return index;
+    return index;
   }
 }

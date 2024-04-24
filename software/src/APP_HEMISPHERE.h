@@ -230,6 +230,9 @@ public:
         help_hemisphere = -1;
         clock_setup = 0;
 
+        showhide_cursor.Init(0, 64);
+        showhide_cursor.Scroll(0);
+
         for (int i = 0; i < 4; ++i) {
             quant_scale[i] = OC::Scales::SCALE_SEMI;
             quantizer[i].Init();
@@ -504,13 +507,21 @@ public:
           draw_applets = false;
         }
         else if (config_menu) {
-          if (config_cursor < CONFIG_DUMMY) {
+          switch(config_page) {
+          case LOADSAVE_POPUP:
             PokePopup(MENU_POPUP);
             // but still draw the applets
-          } else {
+            break;
+
+          case CONFIG_SETTINGS:
             // the popup will linger when moving onto the Config Dummy
             DrawConfigMenu();
             draw_applets = false;
+            break;
+          case SHOWHIDE_APPLETS:
+            DrawAppletList();
+            draw_applets = false;
+            break;
           }
 
           //if (!draw_applets && popup_type == MENU_POPUP) popup_tick = 0; // cancel popup
@@ -778,6 +789,9 @@ private:
     bool config_menu;
     bool isEditing = false;
     int config_cursor = 0;
+    int config_page = 0;
+
+    OC::menu::ScreenCursor<5> showhide_cursor;
 
     int help_hemisphere; // Which of the hemispheres (if any) is in help mode, or -1 if none
     uint32_t click_tick; // Measure time between clicks for double-click
@@ -795,15 +809,40 @@ private:
 
         CVMAP1, CVMAP2, CVMAP3, CVMAP4,
 
-        MAX_CURSOR = CVMAP4
+        SHOWHIDELIST,
+
+        MAX_CURSOR = SHOWHIDELIST
     };
 
-    void ConfigEncoderAction(int h, int dir) {
+    enum HEMConfigPage {
+      LOADSAVE_POPUP,
+      CONFIG_SETTINGS,
+      SHOWHIDE_APPLETS,
+
+      LAST_PAGE = SHOWHIDE_APPLETS
+    };
+
+    void ConfigEncoderAction(const int h, const int dir) {
         if (!isEditing && !preset_cursor) {
+          if (h == 0) { // change pages
+            config_page += dir;
+            config_page = constrain(config_page, 0, LAST_PAGE);
+
+            const int cursorpos[] = { LOAD_PRESET, TRIG_LENGTH, SHOWHIDELIST };
+            config_cursor = cursorpos[config_page];
+          } else if (config_page == SHOWHIDE_APPLETS) {
+            showhide_cursor.Scroll(dir);
+          } else { // move cursor
             config_cursor += dir;
             config_cursor = constrain(config_cursor, 0, MAX_CURSOR);
+
+            if (config_cursor < CONFIG_DUMMY) config_page = LOADSAVE_POPUP;
+            else if (config_cursor < SHOWHIDELIST) config_page = CONFIG_SETTINGS;
+            else config_page = SHOWHIDE_APPLETS;
+
             ResetCursor();
-            return;
+          }
+          return;
         }
 
         switch (config_cursor) {
@@ -868,7 +907,32 @@ private:
         case CURSOR_MODE:
             HS::cursor_wrap = !HS::cursor_wrap;
             break;
+
+        case SHOWHIDELIST:
+            HS::showhide_applet(showhide_cursor.cursor_pos());
+            // IDEA:
+            // if (h == 0) HS::showhide_all();
+            // ...or maybe invert selection?
+            break;
         }
+    }
+
+    void DrawAppletList() {
+      // TODO: list all applets just like the main app menu
+      const size_t LineH = 12;
+
+      int y = (64 - (5 * LineH)) / 2;
+
+      for (int current = showhide_cursor.first_visible();
+           current <= showhide_cursor.last_visible();
+           ++current, y += LineH) {
+
+        gfxIcon(1, y + 1, HS::applet_is_hidden(current) ? CHECK_OFF_ICON : CHECK_ON_ICON);
+        gfxPrint( 11, y + 2, HS::available_applets[current].instance[0]->applet_name());
+
+        if (current == showhide_cursor.cursor_pos())
+          gfxInvert(0, y, 127, LineH - 1);
+      }
     }
 
     void DrawConfigMenu() {
