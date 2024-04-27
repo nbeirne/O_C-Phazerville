@@ -4,6 +4,7 @@
 namespace OC {
 
     Pattern user_patterns[Patterns::PATTERN_USER_ALL];
+    uint8_t pattern_lengths[OC::Patterns::PATTERN_USER_ALL] = { 32, 32, 32, 32, 32, 32, 32, 32};
     Pattern dummy_pattern;
 
     /*static*/

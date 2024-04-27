@@ -8,13 +8,15 @@ struct MiniSeq {
 
   // packed as 6-bit Note Number and two flags
   uint8_t *note = (uint8_t*)(OC::user_patterns[0].notes);
-  int length = MAX_STEPS;
+  uint8_t *length = OC::pattern_lengths;
+
   int step = 0;
   bool reset = 1;
 
   void SetPattern(int &index) {
     CONSTRAIN(index, 0, 7);
     note = (uint8_t*)(OC::user_patterns[index].notes);
+    length = &(OC::pattern_lengths[index]);
   }
   void Clear() {
       for (int s = 0; s < MAX_STEPS; s++) note[s] = 0x20; // C4 == 0V
@@ -34,7 +36,7 @@ struct MiniSeq {
         reset = false;
         return;
       }
-      if (++step >= length) step = 0;
+      if (++step >= GetLength()) step = 0;
   }
   int GetNote(const size_t s_) {
     // lower 6 bits is note value
@@ -71,6 +73,12 @@ struct MiniSeq {
   }
   void Mute(const size_t s_, bool on = true) {
     note[s_] |= (on << 7);
+  }
+  int8_t GetLength() {
+    return *length;
+  }
+  void SetLength(int8_t length_) {
+    *length = length_;
   }
   void ToggleAccent(const size_t s_) {
     note[s_] ^= (0x01 << 6);

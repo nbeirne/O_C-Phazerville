@@ -45,8 +45,6 @@
 class SwitchSeq : public HemisphereApplet
 {
 public:
-  static constexpr int MAX_STEPS = 32;
-
     const char *applet_name()
     {
         return "SwitchSeq";
@@ -65,19 +63,18 @@ public:
         if (Clock(0))
         {
             StartADCLag(0);
+            Advance();
         }
 
         // reset
         if (Clock(1))
         {
-            step = 0;
+            Reset();
         }
 
         // only make changes on a clock'd signal.
         if (EndOfADCLag(0))
         {
-            step = (step + 1) % MAX_STEPS;
-
             ForEachChannel(ch)
             {
                 if (mode[ch] == RAND_MODE)
@@ -156,7 +153,6 @@ private:
 
     // Sequencer
     MiniSeq miniseq[4];
-    int step = 0; // 0 -> MAX_STEPS
 
     // UI
     int cursor = 0;
@@ -204,13 +200,10 @@ private:
 
     void DrawIndicator()
     {
-        // position in sequence
-        gfxPrintfn(49, 15, 3, "%02d", step + 1);
-
         // step
         for (int i = 0; i < 4; i++)
         {
-          gfxPrintfn(43, 25 + (10 * i), 3, "%03d", (miniseq[i].GetNote(step) + 64));
+          gfxPrintfn(43, 25 + (10 * i), 3, "%03d", (miniseq[i].GetNote() + 64));
         }
 
         // arrow indicators
@@ -236,6 +229,23 @@ private:
                 }
             }
         }
+    }
+
+    void Advance() {
+        for (int seq = 0; seq < 4; seq++) {
+            miniseq[seq].Advance();
+        }
+    }
+
+    void Reset() {
+        for (int seq = 0; seq < 4; seq++) {
+            miniseq[seq].Reset();
+            miniseq[seq].Advance();
+        }
+    }
+
+    int StepForSequence(int seq) {
+        return miniseq[seq].step;
     }
 
     // uses cv + encoder. -1 if in QUAN mode.
@@ -264,8 +274,7 @@ private:
         int seq = SequenceForChannel(ch);
         if (seq >= 0)
         {
-            //int value = OC::user_patterns[seq].notes[step];
-            int value = QuantizerLookup(ch, miniseq[seq].GetNote(step) + 64);
+            int value = QuantizerLookup(ch, miniseq[seq].GetNote() + 64);
             if (mode[ch] >= 0)
             {
                 value = value + (Proportion(cv[ch], PP_MAX_INPUT_CV, OCTAVE_RANGE + 1) * OCTAVE_1);

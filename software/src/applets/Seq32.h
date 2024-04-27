@@ -48,7 +48,7 @@ public:
       MAX_CURSOR = TRANSPOSE + MiniSeq::MAX_STEPS
     };
 
-    MiniSeq seq;
+   MiniSeq seq;
 
     const char* applet_name() { // Maximum 10 characters
         return "Seq32";
@@ -165,7 +165,7 @@ public:
 
     void OnEncoderMove(int direction) {
       if (!EditMode()) {
-        MoveCursor(cursor, direction, MAX_CURSOR - (MiniSeq::MAX_STEPS - seq.length));
+        MoveCursor(cursor, direction, MAX_CURSOR - (MiniSeq::MAX_STEPS - seq.GetLength()));
         return;
       }
 
@@ -182,7 +182,7 @@ public:
           break;
 
         case LENGTH:
-          seq.length = constrain(seq.length + direction, 1, MiniSeq::MAX_STEPS);
+          seq.SetLength(constrain(seq.GetLength() + direction, 1, MiniSeq::MAX_STEPS));
           break;
 
         /* handled in popup editor
@@ -206,7 +206,7 @@ public:
         // TODO: save Global Settings data to store modified sequences
         Pack(data, PackLocation {0, 4}, pattern_index);
         Pack(data, PackLocation {4, 4}, seqmode);
-        Pack(data, PackLocation {8, 6}, seq.length);
+        // there are 6 bits here now that length is global.
         Pack(data, PackLocation {14, 6}, transpose + MAX_TRANS);
 
         Pack(data, PackLocation {20, 8}, (uint8_t)GetScale(0));
@@ -218,7 +218,6 @@ public:
     void OnDataReceive(uint64_t data) {
       pattern_mod = pattern_index = Unpack(data, PackLocation {0, 4});
       seqmode = (AccentMode)Unpack(data, PackLocation {4, 4});
-      seq.length = Unpack(data, PackLocation {8, 6});
       trans_mod = transpose = Unpack(data, PackLocation {14, 6}) - MAX_TRANS;
 
       const uint8_t scale = Unpack(data, PackLocation {20,8});
@@ -298,7 +297,7 @@ private:
           DrawSequenceNumber();
 
           gfxIcon(24, 13, LOOP_ICON);
-          gfxPrint(33, 13, seq.length);
+          gfxPrint(33, 13, seq.GetLength());
           gfxIcon(49, 13, RECORD_ICON);
           if (cursor == WRITE_MODE)
             gfxFrame(48, 12, 10, 10);
@@ -311,7 +310,7 @@ private:
       }
 
       // Draw steps
-      for (int s = 0; s < seq.length; s++)
+      for (int s = 0; s < seq.GetLength(); s++)
       {
         const int x = 2 + (s % 8)*8;
         const int y = 26 + (s / 8)*10;

@@ -39,6 +39,7 @@ public:
 extern const char *const pattern_names[];
 extern const char *const pattern_names_short[];
 extern Pattern user_patterns[OC::Patterns::PATTERN_USER_ALL];
+extern uint8_t pattern_lengths[OC::Patterns::PATTERN_USER_ALL];
 extern Pattern dummy_pattern;
 
 };
