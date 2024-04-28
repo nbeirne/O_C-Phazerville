@@ -325,7 +325,7 @@ public:
 
     template<typename... Args>
     void gfxPrintfn(int x, int y, int n, const char *format,  Args ...args) {
-        graphics.setPrintPos(x, y);
+        graphics.setPrintPos(x + gfx_offset, y);
         graphics.printf(format, args...);
     }
 
