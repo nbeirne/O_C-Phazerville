@@ -30,6 +30,8 @@
 // RAND: The CV is ignored, and instead a random sequence is chosen at random.
 // QUAN: The internal sequences are ignored and the CV will be quanitzed to a global scale. Right now that's c-dorian and only configurable in code.
 
+#include "MiniSeq.h"
+
 #define PICK_MODE -1
 #define RAND_MODE -2
 #define QUAN_MODE -3
@@ -43,6 +45,8 @@
 class SwitchSeq : public HemisphereApplet
 {
 public:
+  static constexpr int MAX_STEPS = 32;
+
     const char *applet_name()
     {
         return "SwitchSeq";
@@ -50,8 +54,9 @@ public:
 
     void Start()
     {
-        quantizer.Init();
-        quantizer.Configure(OC::Scales::GetScale(scale), 0xffff);
+      for (int i = 0; i < 4; ++i) {
+        miniseq[i].SetPattern(i);
+      }
     }
 
     void Controller()
@@ -71,7 +76,7 @@ public:
         // only make changes on a clock'd signal.
         if (EndOfADCLag(0))
         {
-            step = (step + 1) % 16;
+            step = (step + 1) % MAX_STEPS;
 
             ForEachChannel(ch)
             {
@@ -84,7 +89,7 @@ public:
                     cv[ch] = In(ch);
                 }
                 int32_t pitch = ValueForChannel(ch);
-                int32_t quantized = quantizer.Process(pitch, root << 7, 0);
+                int32_t quantized = Quantize(ch, pitch, root << 7, 0);
                 Out(ch, quantized);
             }
         }
@@ -145,7 +150,7 @@ protected:
 private:
     // Global Settings
     int root = 0;  // C
-    int scale = 7; // DORI
+    //int scale = 7; // DORI
     // TODO: reset vs. 2nd clock mode
 
     // Modes
@@ -153,16 +158,17 @@ private:
     int cv[2] = {0, 0};    // 0 -> HEMISPHERE_MAX_CV. RAND mode writes to this (and over-writes input CV)
 
     // Sequencer
-    int step = 0; // 0 -> 16
-    braids::Quantizer quantizer;
+    MiniSeq miniseq[4];
+    int step = 0; // 0 -> MAX_STEPS
+    //braids::Quantizer quantizer;
 
     // UI
     int cursor = 0;
 
     void DrawScale()
     {
-        gfxPrint(0, 15, OC::Strings::note_names_unpadded[root]); // we show the scale but can't change it.
-        gfxPrint(8, 15, OC::scale_names_short[scale]);
+        gfxPrint(0, 15, OC::Strings::note_names_unpadded[GetRootNote(0)]); // we show the scale but can't change it.
+        gfxPrint(8, 15, OC::scale_names_short[GetScale(0)]);
     }
 
     void DrawMode()
@@ -187,7 +193,10 @@ private:
                 gfxPrint(0, ypos, "QUAN");
             }
 
-            gfxPrintfn(0, ypos + 10, 4, "%03d", ValueForChannel(ch) / 128);
+            int notenum = MIDIQuantizer::NoteNumber(ValueForChannel(ch));
+            //int notenum = GetLatestNoteNumber(ch);
+            gfxPrint(0, ypos + 10, midi_note_numbers[notenum]);
+            //gfxPrintfn(0, ypos + 10, 4, "%03d", ValueForChannel(ch) / 128);
 
             // cursor when not picking sequence directly
             if (cursor == ch && mode[ch] < 0)
@@ -205,7 +214,7 @@ private:
         // step
         for (int i = 0; i < 4; i++)
         {
-            gfxPrintfn(43, 25 + (10 * i), 3, "%03d", OC::user_patterns[i].notes[step] / 128);
+          gfxPrintfn(43, 25 + (10 * i), 3, "%03d", (miniseq[i].GetNote(step) + 64));
         }
 
         // arrow indicators
@@ -259,7 +268,8 @@ private:
         int seq = SequenceForChannel(ch);
         if (seq >= 0)
         {
-            int value = OC::user_patterns[seq].notes[step];
+            //int value = OC::user_patterns[seq].notes[step];
+            int value = QuantizerLookup(ch, miniseq[seq].GetNote(step) + 64);
             if (mode[ch] >= 0)
             {
                 value = value + (Proportion(cv[ch], PP_MAX_INPUT_CV, OCTAVE_RANGE + 1) * OCTAVE_1);

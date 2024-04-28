@@ -18,12 +18,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include "MiniSeq.h"
+
 class Seq32 : public HemisphereApplet {
 public:
 
-    static constexpr int STEP_COUNT = 32;
-    static constexpr int MIN_VALUE = 0;
-    static constexpr int MAX_VALUE = 63;
     static constexpr int MAX_TRANS = 32;
     static constexpr int GLIDE_FACTOR = 12;
 
@@ -46,83 +45,8 @@ public:
       TRANSPOSE,
       // ---
       NOTES,
-      MAX_CURSOR = TRANSPOSE + STEP_COUNT
+      MAX_CURSOR = TRANSPOSE + MiniSeq::MAX_STEPS
     };
-
-    typedef struct MiniSeq {
-      // packed as 6-bit Note Number and two flags
-      uint8_t *note = (uint8_t*)(OC::user_patterns[0].notes);
-      int length = STEP_COUNT;
-      int step = 0;
-      bool reset = 1;
-
-      void Clear() {
-          for (int s = 0; s < STEP_COUNT; s++) note[s] = 0x20; // C4 == 0V
-      }
-      void Randomize() {
-        for (int s = 0; s < STEP_COUNT; s++) {
-          note[s] = random(0xff);
-        }
-      }
-      void SowPitches(const uint8_t range = 32) {
-        for (int s = 0; s < STEP_COUNT; s++) {
-          SetNote(random(range), s);
-        }
-      }
-      void Advance() {
-          if (reset) {
-            reset = false;
-            return;
-          }
-          if (++step >= length) step = 0;
-      }
-      int GetNote(const size_t s_) {
-        // lower 6 bits is note value
-        // bipolar -32 to +31
-        return int(note[s_] & 0x3f) - 32;
-      }
-      int GetNote() {
-        return GetNote(step);
-      }
-      void SetNote(int nval, const size_t s_) {
-        nval += 32;
-        CONSTRAIN(nval, MIN_VALUE, MAX_VALUE);
-        // keep upper 2 bits
-        note[s_] = (note[s_] & 0xC0) | (uint8_t(nval) & 0x3f);
-        //note[s_] &= ~(0x01 << 7); // unmute?
-      }
-      void SetNote(int nval) {
-        SetNote(nval, step);
-      }
-      bool accent(const size_t s_) {
-        // second highest bit is accent
-        return (note[s_] & (0x01 << 6));
-      }
-      void SetAccent(const size_t s_, bool on = true) {
-        note[s_] &= ~(1 << 6); // clear
-        note[s_] |= (on << 6); // set
-      }
-      bool muted(const size_t s_) {
-        // highest bit is mute
-        return (note[s_] & (0x01 << 7));
-      }
-      void Unmute(const size_t s_) {
-        note[s_] &= ~(0x01 << 7);
-      }
-      void Mute(const size_t s_, bool on = true) {
-        note[s_] |= (on << 7);
-      }
-      void ToggleAccent(const size_t s_) {
-        note[s_] ^= (0x01 << 6);
-      }
-      void ToggleMute(const size_t s_) {
-        note[s_] ^= (0x01 << 7);
-      }
-      void Reset() {
-          step = 0;
-          reset = true;
-      }
-    } MiniSeq;
 
     MiniSeq seq;
 
@@ -144,7 +68,7 @@ public:
           // CV modulation of pattern and transposition
           pattern_mod = pattern_index;
           Modulate(pattern_mod, 0, 0, 7);
-          SetPattern(pattern_mod);
+          seq.SetPattern(pattern_mod);
 
           trans_mod = transpose;
           Modulate(trans_mod, 1, -MAX_TRANS, MAX_TRANS);
@@ -235,13 +159,9 @@ public:
       isEditing = false;
     }
 
-    void SetPattern(int &index) {
-      CONSTRAIN(index, 0, 7);
-      seq.note = (uint8_t*)(OC::user_patterns[index].notes);
-    }
     void OnEncoderMove(int direction) {
       if (!EditMode()) {
-        MoveCursor(cursor, direction, MAX_CURSOR - (STEP_COUNT - seq.length));
+        MoveCursor(cursor, direction, MAX_CURSOR - (MiniSeq::MAX_STEPS - seq.length));
         return;
       }
 
@@ -253,12 +173,12 @@ public:
         case PATTERN:
           // TODO: queued pattern changes
           pattern_index += direction;
-          SetPattern(pattern_index);
+          seq.SetPattern(pattern_index);
           pattern_mod = pattern_index;
           break;
 
         case LENGTH:
-          seq.length = constrain(seq.length + direction, 1, STEP_COUNT);
+          seq.length = constrain(seq.length + direction, 1, MiniSeq::MAX_STEPS);
           break;
 
         case QUANT_SCALE:
@@ -301,7 +221,7 @@ public:
       const uint8_t scale = Unpack(data, PackLocation {20,8});
       const uint8_t root_note = Unpack(data, PackLocation {28, 4});
 
-      SetPattern(pattern_index);
+      seq.SetPattern(pattern_index);
       QuantizerConfigure(0, scale);
       SetRootNote(0, root_note);
       seq.Reset();
