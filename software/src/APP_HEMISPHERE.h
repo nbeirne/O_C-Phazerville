@@ -830,7 +830,7 @@ private:
         // Applet visibility (dummy position)
         SHOWHIDELIST,
 
-        MAX_CURSOR = SHOWHIDELIST
+        MAX_CURSOR = CVMAP4
     };
 
     enum HEMConfigPage {
@@ -861,7 +861,7 @@ private:
             else if (config_cursor <= CURSOR_MODE) config_page = CONFIG_SETTINGS;
             else if (config_cursor < TRIGMAP1) config_page = QUANTIZER_SETTINGS;
             else if (config_cursor < SHOWHIDELIST) config_page = INPUT_SETTINGS;
-            else config_page = SHOWHIDE_APPLETS;
+            //else config_page = SHOWHIDE_APPLETS;
 
             ResetCursor();
           }
