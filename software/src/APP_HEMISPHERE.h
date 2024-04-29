@@ -511,13 +511,24 @@ public:
           case LOADSAVE_POPUP:
             PokePopup(MENU_POPUP);
             // but still draw the applets
+            // the popup will linger when moving onto the Config Dummy
+            break;
+
+          case INPUT_SETTINGS:
+            DrawInputMappings();
+            draw_applets = false;
+            break;
+
+          case QUANTIZER_SETTINGS:
+            DrawQuantizerConfig();
+            draw_applets = false;
             break;
 
           case CONFIG_SETTINGS:
-            // the popup will linger when moving onto the Config Dummy
             DrawConfigMenu();
             draw_applets = false;
             break;
+
           case SHOWHIDE_APPLETS:
             DrawAppletList();
             draw_applets = false;
@@ -790,6 +801,7 @@ private:
     bool isEditing = false;
     int config_cursor = 0;
     int config_page = 0;
+    int dummy_count = 0;
 
     OC::menu::ScreenCursor<5> showhide_cursor;
 
@@ -807,8 +819,15 @@ private:
         SCREENSAVER_MODE,
         CURSOR_MODE,
 
+        // Global Quantizers: 4x(Scale, Root, Mask?)
+        QSCALE1, QSCALE2, QSCALE3, QSCALE4,
+        QROOT1, QROOT2, QROOT3, QROOT4,
+
+        // Input Remapping
+        TRIGMAP1, TRIGMAP2, TRIGMAP3, TRIGMAP4,
         CVMAP1, CVMAP2, CVMAP3, CVMAP4,
 
+        // Applet visibility (dummy position)
         SHOWHIDELIST,
 
         MAX_CURSOR = SHOWHIDELIST
@@ -817,6 +836,8 @@ private:
     enum HEMConfigPage {
       LOADSAVE_POPUP,
       CONFIG_SETTINGS,
+      QUANTIZER_SETTINGS,
+      INPUT_SETTINGS,
       SHOWHIDE_APPLETS,
 
       LAST_PAGE = SHOWHIDE_APPLETS
@@ -828,7 +849,7 @@ private:
             config_page += dir;
             config_page = constrain(config_page, 0, LAST_PAGE);
 
-            const int cursorpos[] = { LOAD_PRESET, TRIG_LENGTH, SHOWHIDELIST };
+            const int cursorpos[] = { LOAD_PRESET, TRIG_LENGTH, QSCALE1, TRIGMAP1, SHOWHIDELIST };
             config_cursor = cursorpos[config_page];
           } else if (config_page == SHOWHIDE_APPLETS) {
             showhide_cursor.Scroll(dir);
@@ -837,7 +858,9 @@ private:
             config_cursor = constrain(config_cursor, 0, MAX_CURSOR);
 
             if (config_cursor < CONFIG_DUMMY) config_page = LOADSAVE_POPUP;
-            else if (config_cursor < SHOWHIDELIST) config_page = CONFIG_SETTINGS;
+            else if (config_cursor <= CURSOR_MODE) config_page = CONFIG_SETTINGS;
+            else if (config_cursor < TRIGMAP1) config_page = QUANTIZER_SETTINGS;
+            else if (config_cursor < SHOWHIDELIST) config_page = INPUT_SETTINGS;
             else config_page = SHOWHIDE_APPLETS;
 
             ResetCursor();
@@ -846,6 +869,39 @@ private:
         }
 
         switch (config_cursor) {
+        case QSCALE1:
+        case QSCALE2:
+        case QSCALE3:
+        case QSCALE4:
+          {
+            const int max = OC::Scales::NUM_SCALES;
+            int &s = HS::quant_scale[config_cursor-QSCALE1];
+
+            s += dir;
+            if (s >= max) s = 0;
+            if (s < 0) s = max - 1;
+
+            HS::quantizer[config_cursor-QSCALE1].Configure(OC::Scales::GetScale(s), 0xffff);
+            break;
+          }
+        case QROOT1:
+        case QROOT2:
+        case QROOT3:
+        case QROOT4:
+          {
+            int &r = HS::root_note[config_cursor-QROOT1];
+            r += dir;
+            CONSTRAIN(r, 0, 11);
+            break;
+          }
+        case TRIGMAP1:
+        case TRIGMAP2:
+        case TRIGMAP3:
+        case TRIGMAP4:
+            HS::trigger_mapping[config_cursor-TRIGMAP1] = constrain(
+                HS::trigger_mapping[config_cursor-TRIGMAP1] + dir,
+                0, ADC_CHANNEL_LAST);
+            break;
         case CVMAP1:
         case CVMAP2:
         case CVMAP3:
@@ -883,6 +939,10 @@ private:
         }
 
         switch (config_cursor) {
+        case CONFIG_DUMMY:
+            ++dummy_count;
+            break;
+
         case SAVE_PRESET:
         case LOAD_PRESET:
             preset_cursor = preset_id + 1;
@@ -892,11 +952,24 @@ private:
             HS::auto_save_enabled = !HS::auto_save_enabled;
             break;
 
+        case QSCALE1:
+        case QSCALE2:
+        case QSCALE3:
+        case QSCALE4:
+        case QROOT1:
+        case QROOT2:
+        case QROOT3:
+        case QROOT4:
+        case TRIGMAP1:
+        case TRIGMAP2:
+        case TRIGMAP3:
+        case TRIGMAP4:
         case CVMAP1:
         case CVMAP2:
         case CVMAP3:
         case CVMAP4:
         case TRIG_LENGTH:
+        default:
             isEditing = !isEditing;
             break;
 
@@ -909,12 +982,75 @@ private:
             break;
 
         case SHOWHIDELIST:
-            // IDEA:
             if (h == 0) // left encoder inverts selection
               HS::hidden_applets = ~HS::hidden_applets;
             else // right encoder toggles current
               HS::showhide_applet(showhide_cursor.cursor_pos());
             break;
+        }
+    }
+
+    void DrawInputMappings() {
+        gfxHeader("<  Input Mapping  >");
+
+        for (int ch=0; ch<4; ++ch) {
+          // Physical trigger input mappings
+          gfxPrint(3 + ch*32, 25, OC::Strings::trigger_input_names_none[ HS::trigger_mapping[ch] ] );
+
+          // Physical CV input mappings
+          gfxPrint(3 + ch*32, 45, OC::Strings::cv_input_names_none[ HS::cvmapping[ch] ] );
+        }
+
+        gfxLine(64, 11, 64, 63);
+
+        switch (config_cursor) {
+        case TRIGMAP1:
+        case TRIGMAP2:
+        case TRIGMAP3:
+        case TRIGMAP4:
+          if (isEditing) gfxInvert(2 + 32*(config_cursor-TRIGMAP1), 24, 20, 9);
+          else gfxCursor(3 + 32*(config_cursor - TRIGMAP1), 33, 19);
+          break;
+        case CVMAP1:
+        case CVMAP2:
+        case CVMAP3:
+        case CVMAP4:
+          if (isEditing) gfxInvert(2 + 32*(config_cursor-CVMAP1), 44, 20, 9);
+          else gfxCursor(3 + 32*(config_cursor - CVMAP1), 53, 19);
+          break;
+        }
+
+    }
+    void DrawQuantizerConfig() {
+        gfxHeader("< Quantizer Setup >");
+
+        for (int ch=0; ch<4; ++ch) {
+          gfxPrint(5 + ch*32, 15, "Q");
+          gfxPrint(ch + 1);
+          gfxLine(5 + ch*32, 24, 18 + ch*32, 24);
+
+          // Scale (TODO: mask editor)
+          gfxPrint(1 + ch*32, 30, OC::scale_names_short[ HS::quant_scale[ch] ]);
+
+          // Root Note
+          gfxPrint(5 + ch*32, 40, OC::Strings::note_names_unpadded[ HS::root_note[ch] ]);
+        }
+
+        switch (config_cursor) {
+        case QSCALE1:
+        case QSCALE2:
+        case QSCALE3:
+        case QSCALE4:
+          if (isEditing) gfxInvert(32*(config_cursor-QSCALE1), 29, 26, 9);
+          else gfxCursor(1 + 32*(config_cursor - QSCALE1), 38, 25);
+          break;
+        case QROOT1:
+        case QROOT2:
+        case QROOT3:
+        case QROOT4:
+          if (isEditing) gfxInvert(4 + 32*(config_cursor-QROOT1), 39, 14, 9);
+          else gfxCursor(5 + 32*(config_cursor - QROOT1), 48, 13);
+          break;
         }
     }
 
@@ -938,7 +1074,7 @@ private:
 
     void DrawConfigMenu() {
         // --- Config Selection
-        gfxHeader("< Presets / Config");
+        gfxHeader("< General Settings >");
 
         gfxPrint(1, 15, "Trig Length: ");
         gfxPrint(HS::trig_length);
@@ -957,11 +1093,6 @@ private:
         const char * const cursor_mode_name[3] = { "modal", "modal+wrap" };
         gfxPrint(1, 35, "Cursor:  ");
         gfxPrint(cursor_mode_name[HS::cursor_wrap]);
-
-        // Physical CV input mappings
-        for (int ch=0; ch<4; ++ch) {
-          gfxPrint(1 + ch*32, 55, OC::Strings::cv_input_names_none[ HS::cvmapping[ch] ] );
-        }
 
         switch (config_cursor) {
         case CVMAP1:
