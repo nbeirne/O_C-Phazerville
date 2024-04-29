@@ -909,10 +909,11 @@ private:
             break;
 
         case SHOWHIDELIST:
-            HS::showhide_applet(showhide_cursor.cursor_pos());
             // IDEA:
-            // if (h == 0) HS::showhide_all();
-            // ...or maybe invert selection?
+            if (h == 0) // left encoder inverts selection
+              HS::hidden_applets = ~HS::hidden_applets;
+            else // right encoder toggles current
+              HS::showhide_applet(showhide_cursor.cursor_pos());
             break;
         }
     }

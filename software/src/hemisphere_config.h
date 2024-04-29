@@ -266,6 +266,8 @@ namespace HS {
   static constexpr Applet available_applets[] = HEMISPHERE_APPLETS;
   static constexpr int HEMISPHERE_AVAILABLE_APPLETS = ARRAY_SIZE(available_applets);
 
+  // TODO: needs to be larger than 64 bits...
+  // TODO: also figure out where to store this
   uint64_t hidden_applets = 0;
   bool applet_is_hidden(const int& index) {
     return (hidden_applets >> index) & 1;
