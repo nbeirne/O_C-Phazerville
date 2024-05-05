@@ -1080,7 +1080,7 @@ private:
         gfxPrint(HS::trig_length);
         gfxPrint("ms");
 
-        const char * const ssmodes[4] = { "[blank]", "Meters", "Zaps",
+        const char * const ssmodes[4] = { "[blank]", "Meters", "Scope",
         #if defined(__IMXRT1062__)
         "Stars"
         #else
@@ -1235,8 +1235,9 @@ void HEMISPHERE_screensaver() {
     case 0x3: // Zips or Stars
         ZapScreensaver(true);
         break;
-    case 0x2: // Zaps
-        ZapScreensaver();
+    case 0x2: // output scope
+        //ZapScreensaver();
+        OC::scope_render();
         break;
     case 0x1: // Meters
         manager.BaseScreensaver(true); // show note names
