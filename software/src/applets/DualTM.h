@@ -30,14 +30,13 @@
  * Heavily adapted as DualTM from ShiftReg/TM by djphazer (Nicholas J. Michalek)
  */
 
-#define TM2_MAX_SCALE OC::Scales::NUM_SCALES
-
-#define TM2_MIN_LENGTH 2
-#define TM2_MAX_LENGTH 32
-
 class DualTM : public HemisphereApplet {
 public:
     
+    static constexpr int MAX_SCALE = OC::Scales::NUM_SCALES;
+    static constexpr int MIN_LENGTH = 2;
+    static constexpr int MAX_LENGTH = 32;
+
     enum TM2Cursor {
         LENGTH,
         PROB,
@@ -109,7 +108,7 @@ public:
                 Modulate(smooth_mod, ch, 0, 127);
                 break;
             case LENGTH_MOD:
-                Modulate(len_mod, ch, TM2_MIN_LENGTH, TM2_MAX_LENGTH);
+                Modulate(len_mod, ch, MIN_LENGTH, MAX_LENGTH);
                 break;
 
             case P_MOD:
@@ -227,7 +226,7 @@ public:
 
         switch ((TM2Cursor)cursor) {
         case LENGTH:
-            length = constrain(length + direction, TM2_MIN_LENGTH, TM2_MAX_LENGTH);
+            length = constrain(length + direction, MIN_LENGTH, MAX_LENGTH);
             break;
         case PROB:
             p = constrain(p + direction, 0, 100);
