@@ -232,43 +232,34 @@ public:
         Out(ch, 0, (high ? PULSE_VOLTAGE : 0));
     }
 
-
+    // Quantizer helpers
     braids::Quantizer* GetQuantizer(int ch) {
-        return &HS::quantizer[io_offset + ch];
+      return &HS::quantizer[io_offset + ch];
     }
     int GetLatestNoteNumber(int ch) {
       return HS::quantizer[io_offset + ch].GetLatestNoteNumber();
     }
     int Quantize(int ch, int cv, int root = 0, int transpose = 0) {
-        if (root == 0) root = (HS::root_note[io_offset + ch] << 7);
-        return HS::quantizer[io_offset + ch].Process(cv, root, transpose);
+      return HS::Quantize(ch + io_offset, cv, root, transpose);
     }
     int QuantizerLookup(int ch, int note) {
-        return HS::quantizer[io_offset + ch].Lookup(note) + (HS::root_note[io_offset+ch] << 7);
+      return HS::QuantizerLookup(ch + io_offset, note);
     }
     void QuantizerConfigure(int ch, int scale, uint16_t mask = 0xffff) {
-        CONSTRAIN(scale, 0, OC::Scales::NUM_SCALES);
-        HS::quant_scale[io_offset + ch] = scale;
-        HS::quantizer[io_offset + ch].Configure(OC::Scales::GetScale(scale), mask);
+      HS::QuantizerConfigure(ch + io_offset, scale, mask);
     }
     int GetScale(int ch) {
-        return HS::quant_scale[io_offset + ch];
+      return HS::quant_scale[io_offset + ch];
     }
     int GetRootNote(int ch) {
-        return HS::root_note[io_offset + ch];
+      return HS::root_note[io_offset + ch];
     }
     int SetRootNote(int ch, int root) {
-        CONSTRAIN(root, 0, 11);
-        return (HS::root_note[io_offset + ch] = root);
+      CONSTRAIN(root, 0, 11);
+      return (HS::root_note[io_offset + ch] = root);
     }
     void NudgeScale(int ch, int dir) {
-        const int max = OC::Scales::NUM_SCALES;
-        int &s = HS::quant_scale[io_offset + ch];
-
-        s+= dir;
-        if (s >= max) s = 0;
-        if (s < 0) s = max - 1;
-        QuantizerConfigure(ch, s);
+      HS::NudgeScale(ch + io_offset, dir);
     }
 
     // Standard bi-polar CV modulation scenario

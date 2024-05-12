@@ -54,20 +54,47 @@ static constexpr uint8_t pad(int range, int number) {
 
 
 namespace HS {
+  enum PopupType {
+    MENU_POPUP,
+    CLOCK_POPUP, PRESET_POPUP,
+    QUANTIZER_POPUP,
+  };
 
-extern braids::Quantizer quantizer[DAC_CHANNEL_LAST]; // global shared quantizers
-extern int quant_scale[DAC_CHANNEL_LAST];
-extern int root_note[DAC_CHANNEL_LAST];
+  extern uint32_t popup_tick; // for button feedback
+  extern PopupType popup_type;
+  extern uint8_t qview; // which quantizer's setting is shown in popup
+  extern bool q_edit;
 
-extern int octave_max;
+  static inline void PokePopup(PopupType pop) {
+    popup_type = pop;
+    popup_tick = OC::CORE::ticks;
+  }
 
-extern int select_mode;
-extern bool cursor_wrap;
+  extern braids::Quantizer quantizer[DAC_CHANNEL_LAST]; // global shared quantizers
+  extern int quant_scale[DAC_CHANNEL_LAST];
+  extern int8_t root_note[DAC_CHANNEL_LAST];
+  extern int8_t q_octave[DAC_CHANNEL_LAST];
 
-extern bool auto_save_enabled;
-extern int trigger_mapping[ADC_CHANNEL_LAST];
-extern int cvmapping[ADC_CHANNEL_LAST];
-extern uint8_t trig_length;
-extern uint8_t screensaver_mode;
+  extern int octave_max;
 
+  extern int select_mode;
+  extern bool cursor_wrap;
+
+  extern bool auto_save_enabled;
+  extern int trigger_mapping[ADC_CHANNEL_LAST];
+  extern int cvmapping[ADC_CHANNEL_LAST];
+  extern uint8_t trig_length;
+  extern uint8_t screensaver_mode;
+
+  // --- Quantizer helpers
+  int GetLatestNoteNumber(int ch);
+  int Quantize(int ch, int cv, int root = 0, int transpose = 0);
+  int QuantizerLookup(int ch, int note);
+  void QuantizerConfigure(int ch, int scale, uint16_t mask = 0xffff);
+  int GetScale(int ch);
+  int GetRootNote(int ch);
+  int SetRootNote(int ch, int root);
+  void NudgeRootNote(int ch, int dir);
+  void NudgeScale(int ch, int dir);
+  void QuantizerEdit(int ch);
 }

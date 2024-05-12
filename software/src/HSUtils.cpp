@@ -5,29 +5,85 @@
 
 namespace HS {
 
-braids::Quantizer quantizer[DAC_CHANNEL_LAST]; // global shared quantizers
-int quant_scale[DAC_CHANNEL_LAST];
-int root_note[DAC_CHANNEL_LAST];
+  uint32_t popup_tick; // for button feedback
+  PopupType popup_type = MENU_POPUP;
+  uint8_t qview = 0; // which quantizer's setting is shown in popup
+  bool q_edit = false; // flag to edit current quantizer
 
-int octave_max = 5;
+  braids::Quantizer quantizer[DAC_CHANNEL_LAST]; // global shared quantizers
+  int quant_scale[DAC_CHANNEL_LAST];
+  int8_t root_note[DAC_CHANNEL_LAST];
+  int8_t q_octave[DAC_CHANNEL_LAST];
 
-int select_mode = -1;
-bool cursor_wrap = 0;
-//uint8_t modal_edit_mode = 2; // 0=old behavior, 1=modal editing, 2=modal with wraparound
-//static void CycleEditMode() { ++modal_edit_mode %= 3; }
+  int octave_max = 5;
 
-bool auto_save_enabled = false;
+  int select_mode = -1;
+  bool cursor_wrap = 0;
+  bool auto_save_enabled = false;
 #ifdef ARDUINO_TEENSY41
-int trigger_mapping[] = { 1, 2, 3, 4, 1, 2, 3, 4 };
-int cvmapping[] = { 5, 6, 7, 8, 0, 0, 0, 0 };
+  int trigger_mapping[] = { 1, 2, 3, 4, 1, 2, 3, 4 };
+  int cvmapping[] = { 5, 6, 7, 8, 0, 0, 0, 0 };
 #else
-int trigger_mapping[] = { 1, 2, 3, 4 };
-int cvmapping[] = { 1, 2, 3, 4 };
+  int trigger_mapping[] = { 1, 2, 3, 4 };
+  int cvmapping[] = { 1, 2, 3, 4 };
 #endif
-uint8_t trig_length = 10; // in ms, multiplier for HEMISPHERE_CLOCK_TICKS
-uint8_t screensaver_mode = 2; // 0 = blank, 1 = Meters, 2 = Zaps
+  uint8_t trig_length = 10; // in ms, multiplier for HEMISPHERE_CLOCK_TICKS
+  uint8_t screensaver_mode = 2; // 0 = blank, 1 = Meters, 2 = Zaps
 
-}
+  // --- Quantizer helpers
+  int GetLatestNoteNumber(int ch) {
+    return quantizer[ch].GetLatestNoteNumber();
+  }
+  int Quantize(int ch, int cv, int root, int transpose) {
+    if (root == 0) root = (root_note[ch] << 7);
+    return quantizer[ch].Process(cv, root, transpose) + (q_octave[ch] * 12 << 7);
+  }
+  int QuantizerLookup(int ch, int note) {
+    return quantizer[ch].Lookup(note) + (root_note[ch] << 7) + (q_octave[ch] * 12 << 7);
+  }
+  void QuantizerConfigure(int ch, int scale, uint16_t mask) {
+    CONSTRAIN(scale, 0, OC::Scales::NUM_SCALES);
+    quant_scale[ch] = scale;
+    quantizer[ch].Configure(OC::Scales::GetScale(scale), mask);
+  }
+  int GetScale(int ch) {
+    return quant_scale[ch];
+  }
+  int GetRootNote(int ch) {
+    return root_note[ch];
+  }
+  int SetRootNote(int ch, int root) {
+    CONSTRAIN(root, 0, 11);
+    return (root_note[ch] = root);
+  }
+  void NudgeRootNote(int ch, int dir) {
+    int8_t &r = root_note[ch];
+    r += dir;
+    if (r > 11 && q_octave[ch] < 3) {
+      ++q_octave[ch];
+      r -= 12;
+    }
+    if (r < 0 && q_octave[ch] > -3) {
+      --q_octave[ch];
+      r += 12;
+    }
+    CONSTRAIN(r, 0, 11);
+  }
+  void NudgeScale(int ch, int dir) {
+    const int max = OC::Scales::NUM_SCALES;
+    int &s = quant_scale[ch];
+
+    s+= dir;
+    if (s >= max) s = 0;
+    if (s < 0) s = max - 1;
+    QuantizerConfigure(ch, s);
+  }
+  void QuantizerEdit(int ch) {
+    qview = ch;
+    q_edit = true;
+  }
+
+} // namespace HS
 
 /* Proportion method using simfloat, useful for calculating scaled values given
  * a fractional value.

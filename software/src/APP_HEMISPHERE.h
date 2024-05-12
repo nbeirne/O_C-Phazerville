@@ -220,10 +220,6 @@ void ReceiveManagerSysEx();
 
 class HemisphereManager : public HSApplication {
 public:
-    enum PopupType {
-      MENU_POPUP,
-      CLOCK_POPUP, PRESET_POPUP,
-    };
     void Start() {
         //select_mode = -1; // Not selecting
 
@@ -447,22 +443,17 @@ public:
 #endif
     }
 
-    inline void PokePopup(PopupType pop) {
-      popup_type = pop;
-      popup_tick = OC::CORE::ticks;
-    }
-
     void DrawPopup() {
-      if (popup_type == MENU_POPUP) {
+      if (HS::popup_type == MENU_POPUP) {
         graphics.clearRect(73, 25, 54, 38);
         graphics.drawFrame(74, 26, 52, 36);
       } else {
-        graphics.clearRect(24, 23, 80, 18);
-        graphics.drawFrame(25, 24, 78, 16);
-        graphics.setPrintPos(29, 28);
+        graphics.clearRect(23, 23, 82, 18);
+        graphics.drawFrame(24, 24, 80, 16);
+        graphics.setPrintPos(28, 28);
       }
 
-      switch (popup_type) {
+      switch (HS::popup_type) {
         case MENU_POPUP:
           gfxPrint(78, 30, "Load");
           gfxPrint(78, 40, config_cursor == AUTO_SAVE ? "(auto)" : "Save");
@@ -495,6 +486,19 @@ public:
         case PRESET_POPUP:
           graphics.print("> Preset ");
           graphics.print(OC::Strings::capital_letters[preset_id]);
+          break;
+        case QUANTIZER_POPUP:
+          graphics.print("Q");
+          graphics.print(HS::qview + 1);
+          graphics.print(":");
+          graphics.print(OC::scale_names_short[ HS::quant_scale[HS::qview] ]);
+          graphics.print(" ");
+          graphics.print(OC::Strings::note_names[ HS::root_note[HS::qview] ]);
+          if (HS::q_octave[HS::qview] >= 0) graphics.print("+");
+          graphics.print(HS::q_octave[HS::qview]);
+          if (HS::q_edit) {
+            gfxInvert(23, 23, 82, 18);
+          }
           break;
       }
     }
@@ -535,8 +539,10 @@ public:
             break;
           }
 
-          //if (!draw_applets && popup_type == MENU_POPUP) popup_tick = 0; // cancel popup
         }
+
+        if (HS::q_edit)
+          PokePopup(QUANTIZER_POPUP);
 
         if (draw_applets) {
           if (clock_setup) {
@@ -572,7 +578,7 @@ public:
         }
 
         // Overlay popup window last
-        if (OC::CORE::ticks - popup_tick < HEMISPHERE_CURSOR_TICKS) {
+        if (OC::CORE::ticks - HS::popup_tick < HEMISPHERE_CURSOR_TICKS) {
             DrawPopup();
         }
     }
@@ -617,7 +623,7 @@ public:
         if (config_menu) {
             // cancel preset select, or config screen on select button release
             config_menu = 0;
-            popup_tick = 0;
+            HS::popup_tick = 0;
             return;
         }
 
@@ -646,7 +652,7 @@ public:
         if (config_menu && !down) {
             // cancel preset select, or config screen on select button release
             config_menu = 0;
-            popup_tick = 0;
+            HS::popup_tick = 0;
             return;
         }
 
@@ -710,6 +716,16 @@ public:
 
     void DelegateEncoderMovement(const UI::Event &event) {
         int h = (event.control == OC::CONTROL_ENCODER_L) ? LEFT_HEMISPHERE : RIGHT_HEMISPHERE;
+
+        if (HS::q_edit) {
+          if (h == LEFT_HEMISPHERE) {
+            HS::NudgeScale(HS::qview, event.value);
+          } else {
+            HS::NudgeRootNote(HS::qview, event.value);
+          }
+          return;
+        }
+
         if (config_menu || preset_cursor) {
             ConfigEncoderAction(h, event.value);
             return;
@@ -770,8 +786,21 @@ public:
                 OC::ui.SetButtonIgnoreMask(); // ignore release and long-press
                 break;
             }
+            if (HS::q_edit) {
+              if (event.control == OC::CONTROL_BUTTON_UP)
+                ++HS::q_octave[HS::qview];
+              else if (event.control == OC::CONTROL_BUTTON_DOWN)
+                --HS::q_octave[HS::qview];
+              else
+                HS::q_edit = false;
+
+              CONSTRAIN(HS::q_octave[HS::qview], -3, 3);
+              OC::ui.SetButtonIgnoreMask();
+              break;
+            }
             // most button-down events fall through here
         case UI::EVENT_BUTTON_PRESS:
+
             if (event.control == OC::CONTROL_BUTTON_UP || event.control == OC::CONTROL_BUTTON_DOWN) {
                 DelegateSelectButtonPush(event);
             } else if (event.control == OC::CONTROL_BUTTON_L || event.control == OC::CONTROL_BUTTON_R) {
@@ -810,8 +839,6 @@ private:
 
     int help_hemisphere; // Which of the hemispheres (if any) is in help mode, or -1 if none
     uint32_t click_tick; // Measure time between clicks for double-click
-    uint32_t popup_tick; // for button feedback
-    PopupType popup_type = PRESET_POPUP;
     int first_click; // The first button pushed of a double-click set, to see if the same one is pressed
 
     enum HEMConfigCursor {
@@ -822,9 +849,8 @@ private:
         SCREENSAVER_MODE,
         CURSOR_MODE,
 
-        // Global Quantizers: 4x(Scale, Root, Mask?)
-        QSCALE1, QSCALE2, QSCALE3, QSCALE4,
-        QROOT1, QROOT2, QROOT3, QROOT4,
+        // Global Quantizers: 4x(Scale, Root, Octave, Mask?)
+        QUANT1, QUANT2, QUANT3, QUANT4,
 
         // Input Remapping
         TRIGMAP1, TRIGMAP2, TRIGMAP3, TRIGMAP4,
@@ -852,7 +878,7 @@ private:
             config_page += dir;
             config_page = constrain(config_page, 0, LAST_PAGE);
 
-            const int cursorpos[] = { LOAD_PRESET, TRIG_LENGTH, QSCALE1, TRIGMAP1, SHOWHIDELIST };
+            const int cursorpos[] = { LOAD_PRESET, TRIG_LENGTH, QUANT1, TRIGMAP1, SHOWHIDELIST };
             config_cursor = cursorpos[config_page];
           } else if (config_page == SHOWHIDE_APPLETS) {
             showhide_cursor.Scroll(dir);
@@ -872,31 +898,20 @@ private:
         }
 
         switch (config_cursor) {
+        /* using popup editor instead
         case QSCALE1:
         case QSCALE2:
         case QSCALE3:
         case QSCALE4:
-          {
-            const int max = OC::Scales::NUM_SCALES;
-            int &s = HS::quant_scale[config_cursor-QSCALE1];
-
-            s += dir;
-            if (s >= max) s = 0;
-            if (s < 0) s = max - 1;
-
-            HS::quantizer[config_cursor-QSCALE1].Configure(OC::Scales::GetScale(s), 0xffff);
+            HS::NudgeScale(config_cursor - QSCALE1, dir);
             break;
-          }
         case QROOT1:
         case QROOT2:
         case QROOT3:
         case QROOT4:
-          {
-            int &r = HS::root_note[config_cursor-QROOT1];
-            r += dir;
-            CONSTRAIN(r, 0, 11);
+            HS::NudgeRootNote(config_cursor - QROOT1, dir);
             break;
-          }
+        */
         case TRIGMAP1:
         case TRIGMAP2:
         case TRIGMAP3:
@@ -955,14 +970,13 @@ private:
             HS::auto_save_enabled = !HS::auto_save_enabled;
             break;
 
-        case QSCALE1:
-        case QSCALE2:
-        case QSCALE3:
-        case QSCALE4:
-        case QROOT1:
-        case QROOT2:
-        case QROOT3:
-        case QROOT4:
+        case QUANT1:
+        case QUANT2:
+        case QUANT3:
+        case QUANT4:
+            HS::QuantizerEdit(config_cursor - QUANT1);
+            break;
+
         case TRIGMAP1:
         case TRIGMAP2:
         case TRIGMAP3:
@@ -998,10 +1012,10 @@ private:
 
         for (int ch=0; ch<4; ++ch) {
           // Physical trigger input mappings
-          gfxPrint(3 + ch*32, 25, OC::Strings::trigger_input_names_none[ HS::trigger_mapping[ch] ] );
+          gfxPrint(4 + ch*32, 25, OC::Strings::trigger_input_names_none[ HS::trigger_mapping[ch] ] );
 
           // Physical CV input mappings
-          gfxPrint(3 + ch*32, 45, OC::Strings::cv_input_names_none[ HS::cvmapping[ch] ] );
+          gfxPrint(4 + ch*32, 45, OC::Strings::cv_input_names_none[ HS::cvmapping[ch] ] );
         }
 
         gfxLine(64, 11, 64, 63);
@@ -1011,15 +1025,15 @@ private:
         case TRIGMAP2:
         case TRIGMAP3:
         case TRIGMAP4:
-          if (isEditing) gfxInvert(2 + 32*(config_cursor-TRIGMAP1), 24, 20, 9);
-          else gfxCursor(3 + 32*(config_cursor - TRIGMAP1), 33, 19);
+          if (isEditing) gfxInvert(3 + 32*(config_cursor-TRIGMAP1), 24, 20, 9);
+          else gfxCursor(4 + 32*(config_cursor - TRIGMAP1), 33, 19);
           break;
         case CVMAP1:
         case CVMAP2:
         case CVMAP3:
         case CVMAP4:
-          if (isEditing) gfxInvert(2 + 32*(config_cursor-CVMAP1), 44, 20, 9);
-          else gfxCursor(3 + 32*(config_cursor - CVMAP1), 53, 19);
+          if (isEditing) gfxInvert(3 + 32*(config_cursor-CVMAP1), 44, 20, 9);
+          else gfxCursor(4 + 32*(config_cursor - CVMAP1), 53, 19);
           break;
         }
 
@@ -1028,31 +1042,29 @@ private:
         gfxHeader("< Quantizer Setup >");
 
         for (int ch=0; ch<4; ++ch) {
-          gfxPrint(5 + ch*32, 15, "Q");
+          const int x = 8 + ch*32;
+
+          gfxPrint(x, 15, "Q");
           gfxPrint(ch + 1);
-          gfxLine(5 + ch*32, 24, 18 + ch*32, 24);
+          gfxLine(x, 24, x + 14, 24);
 
-          // Scale (TODO: mask editor)
-          gfxPrint(1 + ch*32, 30, OC::scale_names_short[ HS::quant_scale[ch] ]);
+          // Scale
+          gfxPrint(x - 3, 30, OC::scale_names_short[ HS::quant_scale[ch] ]);
 
-          // Root Note
-          gfxPrint(5 + ch*32, 40, OC::Strings::note_names_unpadded[ HS::root_note[ch] ]);
+          // Root Note + Octave
+          gfxPrint(x - 3, 40, OC::Strings::note_names[ HS::root_note[ch] ]);
+          if (HS::q_octave[ch] >= 0) gfxPrint("+");
+          gfxPrint(HS::q_octave[ch]);
+
+          // (TODO: mask editor)
         }
 
         switch (config_cursor) {
-        case QSCALE1:
-        case QSCALE2:
-        case QSCALE3:
-        case QSCALE4:
-          if (isEditing) gfxInvert(32*(config_cursor-QSCALE1), 29, 26, 9);
-          else gfxCursor(1 + 32*(config_cursor - QSCALE1), 38, 25);
-          break;
-        case QROOT1:
-        case QROOT2:
-        case QROOT3:
-        case QROOT4:
-          if (isEditing) gfxInvert(4 + 32*(config_cursor-QROOT1), 39, 14, 9);
-          else gfxCursor(5 + 32*(config_cursor - QROOT1), 48, 13);
+        case QUANT1:
+        case QUANT2:
+        case QUANT3:
+        case QUANT4:
+          gfxIcon( 32*(config_cursor-QUANT1), 15, RIGHT_ICON);
           break;
         }
     }
