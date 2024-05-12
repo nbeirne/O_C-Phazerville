@@ -566,6 +566,9 @@ public:
 
             if (select_mode == LEFT_HEMISPHERE) graphics.drawFrame(0, 0, 64, 64);
             if (select_mode == RIGHT_HEMISPHERE) graphics.drawFrame(64, 0, 64, 64);
+
+            // vertical separator
+            graphics.drawLine(63, 0, 63, 63, 2);
         }
 
         // Overlay popup window last
