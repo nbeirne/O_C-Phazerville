@@ -40,8 +40,8 @@ public:
     enum TM2Cursor {
         LENGTH,
         PROB,
-        SCALE,
-        ROOT_NOTE,
+        QUANT_A,
+        QUANT_B,
         RANGE,
         SLEW,
         CVMODE1,
@@ -164,14 +164,14 @@ public:
               int x = constrain(note_trans[2], -range_mod, range_mod);
               int y = range_mod;
               int n = (note * (y + x) + note2 * (y - x)) / (2*y);
-              slew(Output[ch], QuantizerLookup(0, n));
+              slew(Output[ch], QuantizerLookup(ch, n));
               break;
               }
             case PITCH1:
-              slew(Output[ch], QuantizerLookup(0, note + note_trans[0]));
+              slew(Output[ch], QuantizerLookup(ch, note + note_trans[0]));
               break;
             case PITCH2:
-              slew(Output[ch], QuantizerLookup(0, note2 + note_trans[1]));
+              slew(Output[ch], QuantizerLookup(ch, note2 + note_trans[1]));
               break;
             case MOD1: // 8-bit bi-polar proportioned CV
               slew(Output[ch], Proportion( int(reg[0] & 0xff)-0x7f, 0x80, HEMISPHERE_MAX_CV) );
@@ -215,6 +215,9 @@ public:
     }
 
     void OnButtonPress() {
+      if (cursor == QUANT_A || cursor == QUANT_B) {
+        HS::QuantizerEdit(io_offset + (cursor - QUANT_A));
+      } else
         CursorAction(cursor, LAST_SETTING);
     }
 
@@ -231,13 +234,9 @@ public:
         case PROB:
             p = constrain(p + direction, 0, 100);
             break;
-        case SCALE:
-            NudgeScale(0, direction);
-            NudgeScale(1, direction);
-            break;
-        case ROOT_NOTE:
-            root_note = GetRootNote(0);
-            root_note = SetRootNote(0, constrain(root_note + direction, 0, 11));
+        case QUANT_A:
+        case QUANT_B:
+            // TODO? maybe this never happens
             break;
         case RANGE:
             range = constrain(range + direction, 1, 32);
@@ -273,7 +272,9 @@ public:
         Pack(data, PackLocation {33,4}, cvmode[0]);
         Pack(data, PackLocation {37,4}, cvmode[1]);
         Pack(data, PackLocation {41,6}, smoothing);
-        Pack(data, PackLocation {47,4}, root_note);
+        Pack(data, PackLocation {47,4}, GetRootNote(0));
+        Pack(data, PackLocation {51,8}, constrain(GetScale(1), 0, 255));
+        Pack(data, PackLocation {59,4}, GetRootNote(1));
 
         // TODO: utilize enigma's global turing machine storage for the registers
 
@@ -291,10 +292,15 @@ public:
         cvmode[1] = (InputMode) Unpack(data, PackLocation {37,4});
         smoothing = Unpack(data, PackLocation {41,6});
         smoothing = constrain(smoothing, 0, 127);
-        root_note = Unpack(data, PackLocation {47,4});
+        int root_note = Unpack(data, PackLocation {47,4});
 
         QuantizerConfigure(0, scale);
         SetRootNote(0, root_note);
+
+        scale = Unpack(data, PackLocation {51,8});
+        root_note = Unpack(data, PackLocation {59,4});
+        QuantizerConfigure(1, scale);
+        SetRootNote(1, root_note);
     }
 
 protected:
@@ -426,8 +432,8 @@ private:
         default:
         case SLEW:
             gfxBitmap(1, 25, 8, SCALE_ICON);
-            gfxPrint(9, 25, OC::scale_names_short[GetScale(0)]);
-            gfxPrint(39, 25, OC::Strings::note_names_unpadded[GetRootNote(0)]);
+            gfxPrint(12, 25, "Q"); gfxPrint(io_offset + 1);
+            gfxPrint(39, 25, "Q"); gfxPrint(io_offset + 2);
 
             gfxBitmap(1, 35, 8, UP_DOWN_ICON);
             gfxPrint(10, 35, range_mod);
@@ -452,8 +458,8 @@ private:
         switch ((TM2Cursor)cursor) {
             case LENGTH: gfxCursor(12, 23, 13); break;
             case PROB:   gfxCursor(35, 23, 19); break;
-            case SCALE:  gfxCursor( 9, 33, 25); break;
-            case ROOT_NOTE:  gfxCursor( 39, 33, 13); break;
+            case QUANT_A:  gfxCursor(12, 33, 13); break;
+            case QUANT_B:  gfxCursor(39, 33, 13); break;
             case RANGE:  gfxCursor(10, 43, 13); break;
             case SLEW:   gfxCursor(44, 43, 19); break;
 
