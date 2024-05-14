@@ -25,7 +25,10 @@ class Strum : public HemisphereApplet {
 public:
   const char *applet_name() { return "Strum"; }
 
-  void Start() { set_scale(6); }
+  void Start() { 
+    qselect = io_offset;
+    //QuantizerConfigure(0, 6); // Ionian scale
+  }
 
   void Controller() {
 
@@ -52,9 +55,9 @@ public:
 
     if (countdown <= 0 && !index_out_of_bounds && inc != 0) {
       int raw_pitch = In(0);
-      Quantize(0, raw_pitch, root << 7, 0);
-      int note_num = GetQuantizer(0)->GetLatestNoteNumber();
-      int pitch = QuantizerLookup(0, note_num + intervals[index]);
+      HS::Quantize(qselect, raw_pitch);
+      int note_num = HS::GetLatestNoteNumber(0);
+      int pitch = HS::QuantizerLookup(qselect, note_num + intervals[index]);
       disp = note_num;
       Out(0, pitch);
       ClockOut(1);
@@ -76,11 +79,11 @@ public:
   }
 
   void View() {
-    gfxPrint(0, 15, OC::scale_names_short[scale]);
+    gfxPrint(0, 15, OC::scale_names_short[HS::GetScale(qselect)]);
     if (cursor == SCALE)
       gfxCursor(0, 23, 30);
 
-    gfxPrint(36, 15, OC::Strings::note_names_unpadded[root]);
+    gfxPrint(36, 15, OC::Strings::note_names_unpadded[HS::GetRootNote(qselect)]);
     if (cursor == ROOT)
       gfxCursor(36, 23, 12);
 
@@ -89,7 +92,7 @@ public:
     if (cursor == SPACING)
       gfxCursor(0, 33, 28);
 
-    int num_notes = OC::Scales::GetScale(scale).num_notes;
+    int num_notes = OC::Scales::GetScale(HS::GetScale(qselect)).num_notes;
     const int cursor_width = 9;
     const int col_width = cursor_width + 2;
     const int top = 35;
@@ -113,6 +116,12 @@ public:
       if (cursor == INTERVAL_START + i) {
         gfxCursor(col * col_width, num_top + 8, cursor_width);
       }
+
+      int quant_note = disp + (intervals[i] % num_notes);
+      int32_t pitch = QuantizerLookup(qselect, quant_note);
+      int semitone = (MIDIQuantizer::NoteNumber(pitch) + GetRootNote(qselect)) % 12;
+      gfxBitmap(col_width * i, 55, 8, NOTE_NAMES + semitone * 8);
+
       // TODO: Flip indicator on reverse strums, though tbh it looks fine as is
       if (index - inc == i && inc != 0) {
         int c = inc < 0 ? countdown : last_note_dur - countdown;
@@ -128,15 +137,14 @@ public:
     if (cursor == LENGTH) {
       gfxCursor(0, num_top + 8, min(6 * col_width, 63));
     }
-    for (int i=0; i<length; i++) {
-      int quant_note = disp + (intervals[i] % num_notes);
-      int32_t pitch = quantizer->Lookup(quant_note);
-      int semitone = (MIDIQuantizer::NoteNumber(pitch) + root) % 12;
-      gfxBitmap(col_width * i, 55, 8, NOTE_NAMES + semitone * 8);
-    }
   }
 
-  void OnButtonPress() { CursorAction(cursor, 3); }
+  void OnButtonPress() {
+    if (cursor == SCALE || cursor == ROOT)
+      HS::QuantizerEdit(qselect);
+    else
+      CursorAction(cursor, 3);
+  }
 
   void OnEncoderMove(int direction) {
     if (!isEditing) {
@@ -144,13 +152,15 @@ public:
       return;
     }
     switch (cursor) {
+    /* handled in Popup editor
     case SCALE:
-      // scale = constrain(scale + direction, 0, OC::Scales::NUM_SCALES - 1);
-      set_scale(scale + direction);
+      NudgeScale(0, direction);
       break;
     case ROOT:
-      root = constrain(root + direction, 0, 11);
+      SetRootNote(0, GetRootNote(qselect) + direction);
       break;
+    // TODO: modify qselect instead
+    */
     case SPACING:
       spacing = constrain(spacing + direction, HEM_BURST_SPACING_MIN,
                           HEM_BURST_SPACING_MAX);
@@ -167,8 +177,8 @@ public:
 
   uint64_t OnDataRequest() {
     uint64_t data = 0;
-    Pack(data, PackLocation{0, 8}, scale);
-    Pack(data, PackLocation{8, 4}, root);
+    Pack(data, PackLocation{0, 8}, HS::GetScale(qselect));
+    Pack(data, PackLocation{8, 4}, HS::GetRootNote(qselect));
     Pack(data, PackLocation{12, 9}, spacing);
     Pack(data, PackLocation{21, 4}, length);
     for (size_t i = 0; i < MAX_CHORD_LENGTH; i++) {
@@ -178,8 +188,8 @@ public:
   }
 
   void OnDataReceive(uint64_t data) {
-    set_scale(Unpack(data, PackLocation{0, 8}));
-    root = Unpack(data, PackLocation{8, 4});
+    HS::QuantizerConfigure(qselect, Unpack(data, PackLocation{0, 8}));
+    SetRootNote(0, Unpack(data, PackLocation{8, 4}));
     spacing = Unpack(data, PackLocation{12, 9});
     length = Unpack(data, PackLocation{21, 4});
     for (size_t i = 0; i < MAX_CHORD_LENGTH; i++) {
@@ -211,22 +221,11 @@ private:
   int inc = 0;
   int countdown = 0;
 
-  int scale = 5;
-  int16_t root;
-  int16_t semitones;
+  int8_t qselect = 0;
 
   int cursor = 0;
 
   int disp = 64;
 
-  void set_scale(int value) {
-    if (value < 0)
-      scale = OC::Scales::NUM_SCALES - 1;
-    else if (value >= OC::Scales::NUM_SCALES)
-      scale = 0;
-    else
-      scale = value;
-    QuantizerConfigure(0, scale);
-  }
 };
 
