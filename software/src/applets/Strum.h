@@ -56,7 +56,7 @@ public:
     if (countdown <= 0 && !index_out_of_bounds && inc != 0) {
       int raw_pitch = In(0);
       HS::Quantize(qselect, raw_pitch);
-      int note_num = HS::GetLatestNoteNumber(0);
+      int note_num = HS::GetLatestNoteNumber(qselect);
       int pitch = HS::QuantizerLookup(qselect, note_num + intervals[index]);
       disp = note_num;
       Out(0, pitch);
@@ -189,7 +189,7 @@ public:
 
   void OnDataReceive(uint64_t data) {
     HS::QuantizerConfigure(qselect, Unpack(data, PackLocation{0, 8}));
-    SetRootNote(0, Unpack(data, PackLocation{8, 4}));
+    HS::SetRootNote(qselect, Unpack(data, PackLocation{8, 4}));
     spacing = Unpack(data, PackLocation{12, 9});
     length = Unpack(data, PackLocation{21, 4});
     for (size_t i = 0; i < MAX_CHORD_LENGTH; i++) {
