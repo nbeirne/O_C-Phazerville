@@ -89,7 +89,7 @@ public:
                     cv[ch] = In(ch);
                 }
                 int32_t pitch = ValueForChannel(ch);
-                int32_t quantized = Quantize(ch, pitch, root << 7, 0);
+                int32_t quantized = Quantize(ch, pitch);
                 Out(ch, quantized);
             }
         }
@@ -148,9 +148,6 @@ protected:
     }
 
 private:
-    // Global Settings
-    int root = 0;  // C
-    //int scale = 7; // DORI
     // TODO: reset vs. 2nd clock mode
 
     // Modes
@@ -160,7 +157,6 @@ private:
     // Sequencer
     MiniSeq miniseq[4];
     int step = 0; // 0 -> MAX_STEPS
-    //braids::Quantizer quantizer;
 
     // UI
     int cursor = 0;
