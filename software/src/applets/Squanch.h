@@ -34,10 +34,6 @@ public:
     }
 
     void Start() {
-        scale = 5;
-        ForEachChannel(ch) {
-            QuantizerConfigure(ch, scale);
-        }
     }
 
     void Controller() {
@@ -55,7 +51,7 @@ public:
                 // output, the output is raised by one octave when Digital 2 is gated.
                 int32_t shift_alt = (ch == 1) ? DetentedIn(1) : Gate(1) * (12 << 7);
 
-                int32_t quantized = Quantize(ch, pitch + shift_alt, root << 7, shift[ch]);
+                int32_t quantized = Quantize(ch, pitch + shift_alt, 0, shift[ch]);
                 Out(ch, quantized);
                 last_note[ch] = quantized;
             }
@@ -84,37 +80,39 @@ public:
             break;
 
         case SCALE:
-            scale += direction;
-            if (scale >= OC::Scales::NUM_SCALES) scale = 0;
-            if (scale < 0) scale = OC::Scales::NUM_SCALES - 1;
-            ForEachChannel(ch)
-                QuantizerConfigure(ch, scale);
+            NudgeScale(0, direction);
+            SetScale(1, GetScale(0)); // set both to the same
             continuous = 1; // Re-enable continuous mode when scale is changed
             break;
 
         case ROOT_NOTE:
-            root = constrain(root + direction, 0, 11);
+          {
+            int root = GetRootNote(0) + direction;
+            ForEachChannel(ch)
+              SetRootNote(ch, root);
             break;
+          }
         }
     }
         
     uint64_t OnDataRequest() {
         uint64_t data = 0;
-        Pack(data, PackLocation {0,8}, scale);
+        Pack(data, PackLocation {0,8}, GetScale(0));
         Pack(data, PackLocation {8,8}, shift[0] + 48);
         Pack(data, PackLocation {16,8}, shift[1] + 48);
-        Pack(data, PackLocation {24,4}, root);
+        Pack(data, PackLocation {24,4}, GetRootNote(0));
         return data;
     }
 
     void OnDataReceive(uint64_t data) {
-        scale = Unpack(data, PackLocation {0,8});
+        int scale = Unpack(data, PackLocation {0,8});
         shift[0] = Unpack(data, PackLocation {8,8}) - 48;
         shift[1] = Unpack(data, PackLocation {16,8}) - 48;
-        root = Unpack(data, PackLocation {24,4});
-        root = constrain(root, 0, 11);
-        ForEachChannel(ch)
-            QuantizerConfigure(ch, scale);
+        int root = Unpack(data, PackLocation {24,4});
+        ForEachChannel(ch) {
+          SetScale(ch, scale);
+          SetRootNote(ch, root);
+        }
     }
 
 protected:
@@ -133,8 +131,6 @@ private:
     int last_note[2]; // Last quantized note
 
     // Settings
-    int scale;
-    uint8_t root;
     int16_t shift[2];
 
     void DrawInterface() {
@@ -149,8 +145,8 @@ private:
 
         // Scale & Root Note
         gfxIcon(1, 24, SCALE_ICON);
-        gfxPrint(10, 25, OC::scale_names_short[scale]);
-        gfxPrint(40, 25, OC::Strings::note_names_unpadded[root]);
+        gfxPrint(10, 25, OC::scale_names_short[GetScale(0)]);
+        gfxPrint(40, 25, OC::Strings::note_names_unpadded[GetRootNote(0)]);
 
         // Display icon if clocked
         if (!continuous) gfxIcon(56, 25, CLOCK_ICON);

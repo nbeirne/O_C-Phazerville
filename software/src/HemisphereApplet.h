@@ -245,6 +245,9 @@ public:
     int QuantizerLookup(int ch, int note) {
       return HS::QuantizerLookup(ch + io_offset, note);
     }
+    void SetScale(int ch, int scale) {
+      QuantizerConfigure(ch, scale);
+    }
     void QuantizerConfigure(int ch, int scale, uint16_t mask = 0xffff) {
       HS::QuantizerConfigure(ch + io_offset, scale, mask);
     }

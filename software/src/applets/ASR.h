@@ -33,11 +33,7 @@ public:
     }
 
     void Start() {
-        scale = OC::Scales::SCALE_SEMI;
         buffer_m.SetIndex(1);
-        ForEachChannel(ch) {
-            QuantizerConfigure(ch, scale);
-        }
     }
 
     void Controller() {
@@ -73,12 +69,15 @@ public:
     }
 
     void OnButtonPress() {
-        CursorAction(cursor, 1);
+      if (cursor > 0)
+        HS::QuantizerEdit(cursor - 1 + io_offset);
+      else
+        isEditing = !isEditing;
     }
 
     void OnEncoderMove(int direction) {
         if (!EditMode()) {
-            MoveCursor(cursor, direction, 1);
+            MoveCursor(cursor, direction, 2);
             return;
         }
 
@@ -86,6 +85,7 @@ public:
             uint8_t ix = buffer_m.GetIndex();
             buffer_m.SetIndex(ix + direction);
         }
+        /* handled in popup editor
         if (cursor == 1) { // Scale selection
             scale += direction;
             if (scale >= OC::Scales::NUM_SCALES) scale = 0;
@@ -93,19 +93,24 @@ public:
             ForEachChannel(ch)
                 QuantizerConfigure(ch, scale);
         }
+        */
     }
         
     uint64_t OnDataRequest() {
         uint64_t data = 0;
         uint8_t ix = buffer_m.GetIndex();
         Pack(data, PackLocation {0,8}, ix);
-        Pack(data, PackLocation {8,8}, scale);
+        Pack(data, PackLocation {8,8}, GetScale(0));
+        Pack(data, PackLocation {16,8}, GetScale(1));
         return data;
     }
 
     void OnDataReceive(uint64_t data) {
         buffer_m.SetIndex(Unpack(data, PackLocation {0,8}));
-        scale = Unpack(data, PackLocation {8,8});
+        int scale = Unpack(data, PackLocation {8,8});
+        SetScale(0, scale);
+        scale = Unpack(data, PackLocation {16,8});
+        SetScale(1, scale);
     }
 
 protected:
@@ -120,7 +125,6 @@ protected:
     
 private:
     int cursor;
-    int scale;
     int index_mod; // Effect of modulation
     
     void DrawInterface() {
@@ -135,11 +139,17 @@ private:
 
         // Scale
         gfxBitmap(1, 24, 8, SCALE_ICON);
-        gfxPrint(12, 25, OC::scale_names_short[scale]);
+        gfxPrint(12, 25, "Q");
+        gfxPrint(io_offset + 1);
+        gfxPrint(32, 25, "Q");
+        gfxPrint(io_offset + 2);
+
+        //gfxPrint(12, 25, OC::scale_names_short[scale]);
 
         // Cursor
         if (cursor == 0) gfxCursor(43, 23, 18); // Index Cursor
-        if (cursor == 1) gfxCursor(13, 33, 30); // Scale Cursor
+        if (cursor == 1) gfxCursor(13, 33, 13); // Quantizer A
+        if (cursor == 2) gfxCursor(33, 33, 13); // Quantizer B
     }
 
     void DrawData() {

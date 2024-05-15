@@ -31,8 +31,6 @@ public:
         cursor = 0;
         ForEachChannel(ch)
         {
-            scale[ch] = ch + 5;
-            QuantizerConfigure(ch, scale[ch]);
             last_note[ch] = 0;
             continuous[ch] = 1;
         }
@@ -48,7 +46,7 @@ public:
 
             if (continuous[ch] || EndOfADCLag(ch)) {
                 int32_t pitch = In(ch);
-                int32_t quantized = Quantize(ch, pitch, root[ch] << 7, 0);
+                int32_t quantized = Quantize(ch, pitch);
                 Out(ch, quantized);
                 last_note[ch] = quantized;
             }
@@ -71,38 +69,29 @@ public:
 
         uint8_t ch = cursor / 2;
         if (cursor == 0 || cursor == 2) {
-            // Scale selection
-            scale[ch] += direction;
-            if (scale[ch] >= OC::Scales::NUM_SCALES) scale[ch] = 0;
-            if (scale[ch] < 0) scale[ch] = OC::Scales::NUM_SCALES - 1;
-            QuantizerConfigure(ch, scale[ch]);
-            continuous[ch] = 1; // Re-enable continuous mode when scale is changed
+          // Scale selection
+          NudgeScale(ch, direction);
+          continuous[ch] = 1; // Re-enable continuous mode when scale is changed
         } else {
-            // Root selection
-            root[ch] = constrain(root[ch] + direction, 0, 11);
+          // Root selection
+          SetRootNote(ch, GetRootNote(ch) + direction);
         }
     }
 
     uint64_t OnDataRequest() {
         uint64_t data = 0;
-        Pack(data, PackLocation {0,8}, scale[0]);
-        Pack(data, PackLocation {8,8}, scale[1]);
-        Pack(data, PackLocation {16,4}, root[0]);
-        Pack(data, PackLocation {20,4}, root[1]);
+        Pack(data, PackLocation {0,8}, GetScale(0));
+        Pack(data, PackLocation {8,8}, GetScale(1));
+        Pack(data, PackLocation {16,4}, GetRootNote(0));
+        Pack(data, PackLocation {20,4}, GetRootNote(1));
         return data;
     }
 
     void OnDataReceive(uint64_t data) {
-        scale[0] = Unpack(data, PackLocation {0,8});
-        scale[1] = Unpack(data, PackLocation {8,8});
-        root[0] = Unpack(data, PackLocation {16,4});
-        root[1] = Unpack(data, PackLocation {20,4});
-
-        ForEachChannel(ch)
-        {
-            root[0] = constrain(root[0], 0, 11);
-            QuantizerConfigure(ch, scale[ch]);
-        }
+        SetScale(0, Unpack(data, PackLocation {0,8}));
+        SetScale(1, Unpack(data, PackLocation {8,8}));
+        SetRootNote(0, Unpack(data, PackLocation {16,4}));
+        SetRootNote(1, Unpack(data, PackLocation {20,4}));
     }
 
 protected:
@@ -119,10 +108,6 @@ private:
     bool continuous[2]; // Each channel starts as continuous and becomes clocked when a clock is received
     int cursor;
 
-    // Settings
-    int scale[2]; // Scale per channel
-    uint8_t root[2]; // Root per channel
-
     void DrawSelector()
     {
         const uint8_t * notes[2] = {NOTE_ICON, NOTE2_ICON};
@@ -130,9 +115,9 @@ private:
         ForEachChannel(ch)
         {
             // Draw settings
-            gfxPrint((31 * ch), 15, OC::scale_names_short[scale[ch]]);
+            gfxPrint((31 * ch), 15, OC::scale_names_short[GetScale(ch)]);
             gfxBitmap(0 + (31 * ch), 25, 8, notes[ch]);
-            gfxPrint(10 + (31 * ch), 25, OC::Strings::note_names_unpadded[root[ch]]);
+            gfxPrint(10 + (31 * ch), 25, OC::Strings::note_names_unpadded[GetRootNote(ch)]);
 
             // Draw cursor
             int y = cursor % 2; // 0=top line, 1=bottom

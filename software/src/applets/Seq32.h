@@ -131,7 +131,11 @@ public:
     }
 
     void OnButtonPress() {
-      CursorAction(cursor, MAX_CURSOR);
+      if (cursor == QUANT_SCALE || cursor == QUANT_ROOT)
+        HS::QuantizerEdit(io_offset);
+      else
+        CursorAction(cursor, MAX_CURSOR);
+
       if (cursor == WRITE_MODE) // toggle
         write_mode = EditMode();
 
@@ -181,16 +185,15 @@ public:
           seq.length = constrain(seq.length + direction, 1, MiniSeq::MAX_STEPS);
           break;
 
+        /* handled in popup editor
         case QUANT_SCALE:
           NudgeScale(0, direction);
           break;
 
         case QUANT_ROOT:
-        {
-          int root_note = GetRootNote(0);
-          SetRootNote(0, constrain(root_note + direction, 0, 11));
+          SetRootNote(0, GetRootNote(0) + direction);
           break;
-        }
+        */
 
         case TRANSPOSE:
           transpose = constrain(transpose + direction, -MAX_TRANS, MAX_TRANS);
@@ -222,7 +225,7 @@ public:
       const uint8_t root_note = Unpack(data, PackLocation {28, 4});
 
       seq.SetPattern(pattern_index);
-      QuantizerConfigure(0, scale);
+      SetScale(0, scale);
       SetRootNote(0, root_note);
       seq.Reset();
     }

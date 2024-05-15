@@ -35,19 +35,17 @@ public:
         replay = 0;
         reset = true;
         quant_channels = 0;
-        scale = OC::Scales::SCALE_NONE;
-        QuantizerConfigure(0, scale);
         ForEachChannel(ch) {
             Shred(ch);
         }
-        VolageOut();
+        VoltageOut();
     }
 
     void Controller() {
         if (Clock(1)) {
             step = 0; // Reset
             reset = true;
-            VolageOut();
+            VoltageOut();
         }
 
         if (Clock(0)) {
@@ -60,18 +58,18 @@ public:
                 if (x > 3) x = 3;
                 if (y > 3) y = 3;
                 step = (y * 4) + x;
-                VolageOut();
+                VoltageOut();
             } else {
                 if (!reset) {
                     ++step;
                 }
                 reset = false;
                 if (step > 15) step = 0;
-                VolageOut();
+                VoltageOut();
             }
             replay = 0;
         } else if (replay) {
-            VolageOut();
+            VoltageOut();
             replay = 0;
         }
 
@@ -88,9 +86,6 @@ public:
         DrawGrid();
     }
 
-    void CursorButton() {
-        CursorAction(cursor, 3);
-    }
     void AuxButton() {
       if (cursor < 2) {
         Shred(cursor);
@@ -99,7 +94,10 @@ public:
     }
 
     void OnButtonPress() {
-      CursorButton();
+      if (cursor == 3)
+        HS::QuantizerEdit(io_offset);
+      else
+        CursorAction(cursor, 3);
     }
 
     void OnEncoderMove(int direction) {
@@ -130,10 +128,7 @@ public:
         }
         if (cursor == 2) quant_channels = constrain(quant_channels + direction, 0, 2);
         if (cursor == 3) {
-          scale += direction;
-          if (scale >= OC::Scales::NUM_SCALES) scale = 0;
-          if (scale < 0) scale = OC::Scales::NUM_SCALES - 1;
-          QuantizerConfigure(0, scale);
+          NudgeScale(0, direction);
         }
     }
         
@@ -145,7 +140,7 @@ public:
         Pack(data, PackLocation {8,4}, range[1]);
         Pack(data, PackLocation {12,1}, int(bipolar[1]));
         Pack(data, PackLocation {16,8}, quant_channels);
-        Pack(data, PackLocation {24,8}, scale);
+        Pack(data, PackLocation {24,8}, GetScale(0));
         return data;
     }
 
@@ -155,12 +150,11 @@ public:
         range[1] = Unpack(data, PackLocation {8,4});
         bipolar[1] = Unpack(data, PackLocation {12,1}); 
         quant_channels = Unpack(data, PackLocation {16,8});
-        scale = Unpack(data, PackLocation {24,8});
-        QuantizerConfigure(0, scale);
+        SetScale(0, Unpack(data, PackLocation {24,8}));
         ForEachChannel(ch) {
             Shred(ch);
         }
-        VolageOut();
+        VoltageOut();
     }
 
 protected:
@@ -187,7 +181,6 @@ private:
     int range[2] = {1,0};
     bool bipolar[2] = {false, false};
     int8_t quant_channels;
-    int scale;
 
     // Variables to handle imprint confirmation animation
     int confirm_animation_countdown;
@@ -220,7 +213,7 @@ private:
         if (cursor == 2) gfxCursor(42, 33, 20);
 
         // quantize scale selection
-        gfxPrint(32, 35, OC::scale_names_short[scale]);
+        gfxPrint(32, 35, OC::scale_names_short[GetScale(0)]);
         if (cursor == 3) gfxCursor(32, 43, 30);
 
     }
@@ -281,11 +274,11 @@ private:
         confirm_animation_countdown = HEM_SHREDDER_ANIMATION_SPEED;
     }
 
-    void VolageOut() {
+    void VoltageOut() {
         ForEachChannel(ch) {
             current[ch] = sequence[ch][step];
             int8_t qc = quant_channels - 1; 
-            if (qc < 0 || qc == ch) current[ch] = Quantize(0, current[ch], 0, 0);
+            if (qc < 0 || qc == ch) current[ch] = Quantize(0, current[ch]);
             Out(ch, current[ch]);
         }
     }

@@ -25,10 +25,8 @@ public:
   const char *applet_name() { return "Chordnate"; }
 
   void Start() {
-    scale = 5;
     continuous[0] = 1;
     continuous[1] = 1;
-    set_scale(scale);
     update_chord_quantizer();
   }
 
@@ -43,7 +41,7 @@ public:
     if (continuous[0] || EndOfADCLag(0)) {
       chord_root_raw = In(0);
       int32_t new_root_pitch =
-          Quantize(0, chord_root_raw, root << 7, 0);
+          Quantize(0, chord_root_raw);
       if (new_root_pitch != chord_root_pitch) {
         update_chord_quantizer();
         chord_root_pitch = new_root_pitch;
@@ -53,16 +51,16 @@ public:
 
     if (continuous[1] || EndOfADCLag(1)) {
       harm_pitch =
-          Quantize(1, In(1) + chord_root_pitch, root << 7, 0);
+          Quantize(1, In(1) + chord_root_pitch);
       Out(1, harm_pitch);
     }
   }
 
   void View() {
-    gfxPrint(0, 15, OC::scale_names_short[scale]);
+    gfxPrint(0, 15, OC::scale_names_short[GetScale(0)]);
     if (cursor == 0) gfxCursor(0, 23, 30);
 
-    gfxPrint(36, 15, OC::Strings::note_names_unpadded[root]);
+    gfxPrint(36, 15, OC::Strings::note_names_unpadded[GetRootNote(0)]);
     if (cursor == 1) gfxCursor(36, 23, 12);
 
     uint16_t mask = chord_mask;
@@ -103,10 +101,11 @@ public:
 
     switch (cursor) {
     case 0:
-      set_scale(scale + direction);
+      NudgeScale(0, direction);
+      active_scale = OC::Scales::GetScale(GetScale(0));
       break;
     case 1:
-      root = constrain(root + direction, 0, 11);
+      SetRootNote(0, GetRootNote(0) + direction);
       break;
     default:
       // shouldn't happen...
@@ -117,15 +116,15 @@ public:
 
   uint64_t OnDataRequest() {
     uint64_t data = 0;
-    Pack(data, PackLocation{0, 8}, scale);
-    Pack(data, PackLocation{8, 4}, root);
+    Pack(data, PackLocation{0, 8}, GetScale(0));
+    Pack(data, PackLocation{8, 4}, GetRootNote(0));
     Pack(data, PackLocation{12, 16}, chord_mask);
     return data;
   }
 
   void OnDataReceive(uint64_t data) {
-    set_scale(Unpack(data, PackLocation{0, 8}));
-    root = Unpack(data, PackLocation{8, 4});
+    SetScale(0, Unpack(data, PackLocation{0, 8}));
+    SetRootNote(0, Unpack(data, PackLocation{8, 4}));
     chord_mask = Unpack(data, PackLocation{12, 16});
     update_chord_quantizer();
   }
@@ -140,7 +139,6 @@ protected:
 
 private:
   int scale; // SEMI
-  int16_t root;
   bool continuous[2];
   braids::Scale active_scale;
 
@@ -156,10 +154,10 @@ private:
 
   void update_chord_quantizer() {
     size_t num_notes = active_scale.num_notes;
-    chord_root_pitch = Quantize(0, chord_root_raw, root, 0);
+    chord_root_pitch = Quantize(0, chord_root_raw);
     size_t chord_root = note_ix(chord_root_pitch);
     uint16_t mask = rotl32(chord_mask, num_notes, chord_root);
-    QuantizerConfigure(1, scale, mask);
+    QuantizerConfigure(1, GetScale(0), mask);
   }
 
   size_t note_ix(int pitch) {
@@ -176,11 +174,4 @@ private:
     return p;
   }
 
-  void set_scale(int value) {
-    if (value < 0) scale = OC::Scales::NUM_SCALES - 1;
-    else if (value >= OC::Scales::NUM_SCALES) scale = 0;
-    else scale = value;
-    active_scale = OC::Scales::GetScale(scale);
-    QuantizerConfigure(0, scale);
-  }
 };
