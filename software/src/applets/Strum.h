@@ -53,6 +53,9 @@ public:
         index = length - 1;
     }
 
+    spacing_mod = spacing;
+    Modulate(spacing_mod, 1, HEM_BURST_SPACING_MIN, HEM_BURST_SPACING_MAX);
+
     if (countdown <= 0 && !index_out_of_bounds && inc != 0) {
       int raw_pitch = In(0);
       HS::Quantize(qselect, raw_pitch);
@@ -62,11 +65,9 @@ public:
       Out(0, pitch);
       ClockOut(1);
 
-      int spacing_mod = Proportion(In(1), HEMISPHERE_MAX_INPUT_CV,
-                                   17 * HEM_BURST_SPACING_MAX);
-      last_note_dur =
-          constrain((17 * spacing + spacing_mod), 17 * HEM_BURST_SPACING_MIN,
-                    17 * HEM_BURST_SPACING_MAX);
+      last_note_dur = 17 * spacing;
+      Modulate(last_note_dur, 1, 17 * HEM_BURST_SPACING_MIN, 17 * HEM_BURST_SPACING_MAX);
+
       countdown += last_note_dur;
       index += inc;
     } else if (countdown > 0) {
@@ -79,18 +80,21 @@ public:
   }
 
   void View() {
-    gfxPrint(0, 15, OC::scale_names_short[HS::GetScale(qselect)]);
-    if (cursor == SCALE)
-      gfxCursor(0, 23, 30);
+    gfxPrint(8, 15, OC::scale_names_short[HS::GetScale(qselect)]);
+    gfxPrint(42, 15, OC::Strings::note_names_unpadded[HS::GetRootNote(qselect)]);
+    if (cursor == QUANT)
+      gfxCursor(7, 23, 48);
 
-    gfxPrint(36, 15, OC::Strings::note_names_unpadded[HS::GetRootNote(qselect)]);
-    if (cursor == ROOT)
-      gfxCursor(36, 23, 12);
-
-    gfxPrint(0, 25, spacing);
+    if (show_encoder) {
+      gfxPrint(8 + pad(100, spacing), 25, spacing);
+      --show_encoder;
+    } else {
+      gfxPrint(8 + pad(100, spacing_mod), 25, spacing_mod);
+      if (spacing_mod != spacing) gfxIcon(1, 23, CV_ICON);
+    }
     gfxPrint(28, 25, "ms");
     if (cursor == SPACING)
-      gfxCursor(0, 33, 28);
+      gfxCursor(1, 33, 27);
 
     int num_notes = OC::Scales::GetScale(HS::GetScale(qselect)).num_notes;
     const int cursor_width = 9;
@@ -140,15 +144,15 @@ public:
   }
 
   void OnButtonPress() {
-    if (cursor == SCALE || cursor == ROOT)
+    if (cursor == QUANT)
       HS::QuantizerEdit(qselect);
     else
-      CursorAction(cursor, 3);
+      isEditing = !isEditing;
   }
 
   void OnEncoderMove(int direction) {
     if (!isEditing) {
-      MoveCursor(cursor, direction, INTERVAL_START + length);
+      MoveCursor(cursor, direction, INTERVAL_START + length - 1);
       return;
     }
     switch (cursor) {
@@ -164,6 +168,7 @@ public:
     case SPACING:
       spacing = constrain(spacing + direction, HEM_BURST_SPACING_MIN,
                           HEM_BURST_SPACING_MAX);
+      show_encoder = HEMISPHERE_PULSE_ANIMATION_TIME;
       break;
     case LENGTH:
       length = constrain(length + direction, 1, MAX_CHORD_LENGTH);
@@ -192,6 +197,9 @@ public:
     HS::SetRootNote(qselect, Unpack(data, PackLocation{8, 4}));
     spacing = Unpack(data, PackLocation{12, 9});
     length = Unpack(data, PackLocation{21, 4});
+    CONSTRAIN(spacing, HEM_BURST_SPACING_MIN, HEM_BURST_SPACING_MAX);
+    CONSTRAIN(length, 1, MAX_CHORD_LENGTH);
+
     for (size_t i = 0; i < MAX_CHORD_LENGTH; i++) {
       intervals[i] = Unpack(data, PackLocation{25 + i * 6, 6}) + MIN_INTERVAL;
     }
@@ -210,16 +218,18 @@ private:
   static const int MAX_CHORD_LENGTH = 6;
   static const int MIN_INTERVAL = -12;
   static const int MAX_INTERVAL = 48;
-  enum Params { SCALE, ROOT, SPACING, LENGTH, INTERVAL_START };
+  enum Params { QUANT, SPACING, LENGTH, INTERVAL_START };
 
   int8_t intervals[MAX_CHORD_LENGTH] = {0, 4, 7, 9, 11, 14};
   int length = 6;
   int spacing = HEM_BURST_SPACING_MIN;
+  int spacing_mod = HEM_BURST_SPACING_MIN; // for display
   int last_note_dur;
 
   int index = 0;
   int inc = 0;
   int countdown = 0;
+  int show_encoder = 0;
 
   int8_t qselect = 0;
 
