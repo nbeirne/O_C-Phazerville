@@ -42,13 +42,7 @@ class TB_3PO: public HemisphereApplet {
     rand_apply_anim = 0;
     curr_step_semitone = 0;
 
-    root = 0;
-    octave_offset = 0;
-
-    // Init the quantizer for selecting pitches / CVs from
-    scale = 29; // GUNA scale sounds cool   //OC::Scales::SCALE_SEMI; // semi sounds pretty bunk
-    quantizer = GetQuantizer(0);
-    set_quantizer_scale(scale);
+    set_quantizer_scale(GetScale(0));
 
     density = 12;
     density_encoder_display = 0;
@@ -86,7 +80,7 @@ class TB_3PO: public HemisphereApplet {
 
     transpose_cv = 0;
     if (DetentedIn(0)) {
-      transpose_cv = quantizer->Process(In(0), 0, 0); // Use root == 0 to start at c
+      transpose_cv = Quantize(0, In(0), 0, 0); // Use root == 0 to start at c
     }
 
     density_cv = Proportion(DetentedIn(1), HEMISPHERE_MAX_INPUT_CV, 15);
@@ -215,27 +209,26 @@ class TB_3PO: public HemisphereApplet {
 
       break;
     case 6: { // Scale selection
-      scale += direction;
-      if (scale >= OC::Scales::NUM_SCALES) scale = 0;
-      if (scale < 0) scale = OC::Scales::NUM_SCALES - 1;
-      set_quantizer_scale(scale);
+      NudgeScale(0, direction);
+      set_quantizer_scale(GetScale(0));
       break;
     }
     case 7: { // Root note selection
 
-      int r = root + direction;
+      int r = GetRootNote(0) + direction;
+      int8_t &q_oct = HS::q_octave[io_offset];
       const int max_root = 12;
 
-      if (direction > 0 && r >= max_root && octave_offset < 3) {
-        ++octave_offset; // Go up to next octave
+      if (direction > 0 && r >= max_root && q_oct < 3) {
+        ++q_oct; // Go up to next octave
         r = 0; // Roll around root note
-      } else if (direction < 0 && r < 0 && octave_offset > -3) {
-        --octave_offset;
+      } else if (direction < 0 && r < 0 && q_oct > -3) {
+        --q_oct;
 
         r = max_root - 1;
       }
 
-      root = constrain(r, 0, max_root - 1);
+      SetRootNote(0, r);
 
       break;
     }
@@ -248,30 +241,30 @@ class TB_3PO: public HemisphereApplet {
   uint64_t OnDataRequest() {
     uint64_t data = 0;
 
-    Pack(data, PackLocation { 0, 8 }, scale);
-    Pack(data, PackLocation { 8, 4 }, root);
+    Pack(data, PackLocation { 0, 8 }, GetScale(0));
+    Pack(data, PackLocation { 8, 4 }, GetRootNote(0));
     Pack(data, PackLocation { 12, 4 }, density_encoder);
     Pack(data, PackLocation { 16, 16 }, seed);
-    Pack(data, PackLocation { 32, 8 }, octave_offset);
+    Pack(data, PackLocation { 32, 8 }, HS::q_octave[io_offset]);
     Pack(data, PackLocation { 40, 5 }, num_steps - 1);
     return data;
   }
 
   void OnDataReceive(uint64_t data) {
 
-    scale = Unpack(data, PackLocation { 0, 8 });
-    root = Unpack(data, PackLocation { 8, 4 });
+    int scale = Unpack(data, PackLocation { 0, 8 });
+    SetRootNote(0, Unpack(data, PackLocation { 8, 4 }));
     density_encoder = Unpack(data, PackLocation { 12, 4 });
     seed = Unpack(data, PackLocation { 16, 16 });
-    octave_offset = Unpack(data, PackLocation { 32, 8 });
+    HS::q_octave[io_offset] = Unpack(data, PackLocation { 32, 8 });
+    CONSTRAIN(HS::q_octave[io_offset], -3, 3);
     num_steps = Unpack(data, PackLocation { 40, 5 }) + 1;
 
+    SetScale(0, scale);
     set_quantizer_scale(scale);
 
-    root = constrain(root, 0, 11);
     density_encoder = constrain(density_encoder, 0, 14); // Internally just positive
     density = density_encoder;
-    octave_offset = constrain(octave_offset, -3, 3);
 
     // Restore all seed-derived settings!
     regenerate_all();
@@ -292,7 +285,6 @@ protected:
 
 private:
   int cursor = 0;
-  braids::Quantizer * quantizer;
 
   // User settings
 
@@ -303,10 +295,6 @@ private:
   int lock_seed; // If 1, the seed won't randomize (and manual editing is enabled)
 
   uint16_t seed; // The random seed that deterministically builds the sequence
-
-  int scale; // Active quantization & generation scale
-  uint8_t root; // Root note
-  int8_t octave_offset; // Manual octave offset (based on size of current scale, added to root note)
 
   uint8_t density; // The density parameter controls a couple of things at once. Its 0-14 value is mapped to -7..+7 range
   // The larger the magnitude from zero in either direction, the more dense the note patterns are (fewer rests)
@@ -362,9 +350,6 @@ private:
     // transpose in scale degrees, proportioned from semitones
     quant_note += (MIDIQuantizer::NoteNumber(transpose_cv) - 60) * scale_size / 12;
 
-    // Apply the manual octave offset
-    quant_note += (int(octave_offset) * int(scale_size));
-
     // Transpose by one octave up or down if flagged to (note this is one full span of whatever scale is active to give doubling octave behavior)
     if (step_is_oct_up(step_num)) {
       quant_note += scale_size;
@@ -375,15 +360,15 @@ private:
     quant_note = constrain(quant_note, 0, 127);
 
     // root note is the semitone offset after quantization
-    return quantizer->Lookup(quant_note) + (root << 7);
-    //return quantizer->Lookup( 64 );  // Test: note 64 is definitely 0v=c4 if output directly, on ALL scales
+    return QuantizerLookup(0, quant_note);
+    //return QuantizerLookup(0, 64 );  // Test: note 64 is definitely 0v=c4 if output directly, on ALL scales
   }
 
   int get_semitone_for_step(int step_num) {
     // Don't add in octaves-- use the current quantizer limited to the base octave
     int quant_note = 64 + notes[step_num]; // + transpose_note_in;
-    int32_t cv_note = quantizer->Lookup(constrain(quant_note, 0, 127));
-    return (MIDIQuantizer::NoteNumber(cv_note) + root) % 12;
+    int32_t cv_note = QuantizerLookup(0, constrain(quant_note, 0, 127));
+    return (MIDIQuantizer::NoteNumber(cv_note)) % 12;
   }
 
   void reseed() {
@@ -570,9 +555,9 @@ private:
     return (random(1, 100) <= prob) ? 1 : 0;
   }
 
+  // deprecated - only used to cache num_notes
   void set_quantizer_scale(int new_scale) {
-    const braids::Scale & quant_scale = OC::Scales::GetScale(new_scale);
-    quantizer->Configure(quant_scale, 0xffff);
+    const braids::Scale &quant_scale = OC::Scales::GetScale(new_scale);
     scale_size = quant_scale.num_notes; // Track this scale size for octaves and display
   }
 
@@ -652,11 +637,12 @@ private:
     gfxPrint(14, 37, dens_display);
 
     // Scale and root note select
-    gfxPrint(39, 26, OC::scale_names_short[scale]);
+    gfxPrint(39, 26, OC::scale_names_short[GetScale(0)]);
 
-    gfxPrint((octave_offset == 0 ? 45 : 39), 36, OC::Strings::note_names_unpadded[root]);
-    if (octave_offset != 0) {
-      gfxPrint(51, 36, octave_offset);
+    int8_t &q_oct = HS::q_octave[io_offset];
+    gfxPrint((q_oct == 0 ? 45 : 39), 36, OC::Strings::note_names_unpadded[GetRootNote(0)]);
+    if (q_oct != 0) {
+      gfxPrint(51, 36, q_oct);
     }
 
     // Current / total steps
@@ -676,11 +662,10 @@ private:
 
     // Draw a TB-303 style octave of a piano keyboard, indicating the playing pitch 
     int x = 1;
-    int y;
     const int keyPatt = 0x054A; // keys encoded as 0=white 1=black, starting at c, backwards:  b  0 0101 0100 1010
     for (int i = 0; i < 12; ++i) {
       // Black key?
-      y = ((keyPatt >> i) & 0x1) ? 56 : 61;
+      const int y = ((keyPatt >> i) & 0x1) ? 56 : 61;
 
       // Two white keys in a row E and F
       if (i == 5) x += 3;
