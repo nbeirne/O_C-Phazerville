@@ -637,12 +637,12 @@ private:
     gfxPrint(14, 37, dens_display);
 
     // Scale and root note select
-    gfxPrint(39, 26, OC::scale_names_short[GetScale(0)]);
+    gfxPrint(38, 26, OC::scale_names_short[GetScale(0)]);
 
     int8_t &q_oct = HS::q_octave[io_offset];
-    gfxPrint((q_oct == 0 ? 45 : 39), 36, OC::Strings::note_names_unpadded[GetRootNote(0)]);
+    gfxPrint((q_oct == 0 ? 44 : 38), 36, OC::Strings::note_names_unpadded[GetRootNote(0)]);
     if (q_oct != 0) {
-      gfxPrint(51, 36, q_oct);
+      gfxPrint(50, 36, q_oct);
     }
 
     // Current / total steps
@@ -658,7 +658,8 @@ private:
       gfxBitmap(41, 54, 8, UP_BTN_ICON);
     }
 
-    gfxPrint(49, 55, curr_step_semitone);
+    gfxPrint(49, 55, OC::Strings::note_names_unpadded[curr_step_semitone]);
+    //gfxPrint(49, 55, curr_step_semitone);
 
     // Draw a TB-303 style octave of a piano keyboard, indicating the playing pitch 
     int x = 1;
@@ -710,10 +711,10 @@ private:
       gfxCursor(9, 45, 14); // density
       break;
     case 6:
-      gfxCursor(39, 34, 25); // scale
+      gfxCursor(38, 34, 25); // scale
       break;
     case 7:
-      gfxCursor(39, 44, 24); // root note
+      gfxCursor(38, 44, 24); // root note
       break;
     case 8:
       gfxCursor(20, 54, 12, 8); // step
