@@ -69,11 +69,12 @@ public:
         // reset
         if (Clock(1))
         {
+            StartADCLag(1);
             Reset();
         }
 
         // only make changes on a clock'd signal.
-        if (EndOfADCLag(0))
+        if (EndOfADCLag(0) || EndOfADCLag(1))
         {
             ForEachChannel(ch)
             {
