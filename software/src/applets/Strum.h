@@ -122,8 +122,8 @@ public:
       }
 
       int quant_note = disp + (intervals[i] % num_notes);
-      int32_t pitch = QuantizerLookup(qselect, quant_note);
-      int semitone = (MIDIQuantizer::NoteNumber(pitch) + GetRootNote(qselect)) % 12;
+      int32_t pitch = HS::QuantizerLookup(qselect, quant_note);
+      int semitone = (MIDIQuantizer::NoteNumber(pitch) + HS::GetRootNote(qselect)) % 12;
       gfxBitmap(col_width * i, 55, 8, NOTE_NAMES + semitone * 8);
 
       // TODO: Flip indicator on reverse strums, though tbh it looks fine as is
