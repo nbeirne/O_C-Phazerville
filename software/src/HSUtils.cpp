@@ -99,9 +99,9 @@ namespace HS {
  *
  */
 int Proportion(int numerator, int denominator, int max_value) {
-    simfloat proportion = int2simfloat((int32_t)numerator) / (int32_t)denominator;
+    simfloat proportion = int2simfloat((int32_t)abs(numerator)) / (int32_t)denominator;
     int scaled = simfloat2int(proportion * max_value);
-    return scaled >= 0 ? scaled : scaled + 1;
+    return numerator >= 0 ? scaled : -scaled;
 }
 
 /* Proportion CV values into pixels for display purposes.
