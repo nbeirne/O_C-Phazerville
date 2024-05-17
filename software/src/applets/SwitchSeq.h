@@ -88,9 +88,8 @@ public:
                 {
                     cv[ch] = In(ch);
                 }
-                int32_t pitch = ValueForChannel(ch);
-                int32_t quantized = Quantize(ch, pitch);
-                Out(ch, quantized);
+                int32_t cv = ValueForChannel(ch);
+                Out(ch, cv);
             }
         }
     }
@@ -266,23 +265,25 @@ private:
         return play_note;
     }
 
-    // get pre-quantize CV
+    // get quantized output as cv
     int ValueForChannel(int ch)
     {
+        int value = 0;
         int seq = SequenceForChannel(ch);
         if (seq >= 0)
         {
-            int value = QuantizerLookup(ch, NoteForSequence(seq));
+            value = QuantizerLookup(ch, NoteForSequence(seq));
             if (mode[ch] >= 0)
             {
                 value = value + (Proportion(cv[ch], PP_MAX_INPUT_CV, OCTAVE_RANGE) * OCTAVE_1);
             }
-            return value;
         }
         else // QUAN mode... or we were not able to find a sequence.
         {
-            int reduced = Proportion(cv[ch], PP_MAX_INPUT_CV, OCTAVE_RANGE * OCTAVE_1);
-            return reduced;
+            value = Proportion(cv[ch], PP_MAX_INPUT_CV, OCTAVE_RANGE * OCTAVE_1);
         }
+
+        int quantized = Quantize(ch, value);
+        return quantized;
     }
 };
