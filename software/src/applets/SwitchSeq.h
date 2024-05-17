@@ -192,7 +192,8 @@ private:
         // step
         for (int i = 0; i < 4; i++)
         {
-          gfxPrintfn(6*7 + 1, 25 + (10 * i), 3, "%3d", miniseq[i].GetNote() + 64);
+          int note = NoteForSequence(i);
+          gfxPrintfn(6*7 + 1, 25 + (10 * i), 3, "%3d", note);
         }
 
         // arrow indicators
@@ -257,16 +258,24 @@ private:
         return seq;
     }
 
+    // returns the index for the quantizer. Must be used in QuantizerLookup.
+    int NoteForSequence(int seq)
+    {
+        int play_note = miniseq[seq].GetNote() + 64;
+        CONSTRAIN(play_note, 0, 127);
+        return play_note;
+    }
+
     // get pre-quantize CV
     int ValueForChannel(int ch)
     {
         int seq = SequenceForChannel(ch);
         if (seq >= 0)
         {
-            int value = QuantizerLookup(ch, miniseq[seq].GetNote() + 64);
+            int value = QuantizerLookup(ch, NoteForSequence(seq));
             if (mode[ch] >= 0)
             {
-                value = value + (Proportion(cv[ch], PP_MAX_INPUT_CV, OCTAVE_RANGE + 1) * OCTAVE_1);
+                value = value + (Proportion(cv[ch], PP_MAX_INPUT_CV, OCTAVE_RANGE) * OCTAVE_1);
             }
             return value;
         }
