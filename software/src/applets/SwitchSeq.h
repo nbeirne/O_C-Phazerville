@@ -98,7 +98,6 @@ public:
     void View()
     {
         gfxHeader(applet_name());
-        // DrawScale();
         DrawMode();
         DrawIndicator();
     }
@@ -134,22 +133,17 @@ public:
     }
 
 protected:
-    // TODO: global scale
-    // TODO: help
-
     void SetHelp()
     {
         //                               "------------------" <-- Size Guide
         help[HEMISPHERE_HELP_DIGITALS] = "1=Clock,2=Reset";
-        help[HEMISPHERE_HELP_CVS] = "CV Ch1,Ch2";
-        help[HEMISPHERE_HELP_OUTS] = "A=Out1,B=Out1";
-        help[HEMISPHERE_HELP_ENCODER] = "Change Mode,Seq";
+        help[HEMISPHERE_HELP_CVS]      = "CV Ch1,Ch2";
+        help[HEMISPHERE_HELP_OUTS]     = "A=Out1,B=Out1";
+        help[HEMISPHERE_HELP_ENCODER]  = "Change Mode,Seq";
         //                               "------------------" <-- Size Guide
     }
 
 private:
-    // TODO: reset vs. 2nd clock mode
-
     // Modes
     int mode[2] = {0, -1}; // 0-3: sequences 0-3 with CV octave transpose (0, 1, or 2 octaves). -1: CV picks sequence, -2 = CV quantize mode, -3 = pick random sequence
     int cv[2] = {0, 0};    // 0 -> HEMISPHERE_MAX_CV. RAND mode writes to this (and over-writes input CV)
@@ -159,12 +153,6 @@ private:
 
     // UI
     int cursor = 0;
-
-    void DrawScale()
-    {
-        gfxPrint(0, 15, OC::Strings::note_names_unpadded[GetRootNote(0)]); // we show the scale but can't change it.
-        gfxPrint(8, 15, OC::scale_names_short[GetScale(0)]);
-    }
 
     void DrawMode()
     {
@@ -177,21 +165,19 @@ private:
             }
             else if (mode[ch] == PICK_MODE)
             {
-                gfxPrint(0, ypos, "PICK");
+                gfxPrint(0, ypos, "PCK");
             }
             else if (mode[ch] == RAND_MODE)
             {
-                gfxPrint(0, ypos, "RAND");
+                gfxPrint(0, ypos, "RNG");
             }
             else if (mode[ch] == QUAN_MODE)
             {
-                gfxPrint(0, ypos, "QUAN");
+                gfxPrint(0, ypos, "QNT");
             }
 
             int notenum = MIDIQuantizer::NoteNumber(ValueForChannel(ch));
-            //int notenum = GetLatestNoteNumber(ch);
-            gfxPrint(0, ypos + 10, midi_note_numbers[notenum]);
-            //gfxPrintfn(0, ypos + 10, 4, "%03d", ValueForChannel(ch) / 128);
+            gfxPrintfn(0, ypos + 10, 4, "%3s", midi_note_numbers[notenum]);
 
             // cursor when not picking sequence directly
             if (cursor == ch && mode[ch] < 0)
@@ -206,7 +192,7 @@ private:
         // step
         for (int i = 0; i < 4; i++)
         {
-          gfxPrintfn(43, 25 + (10 * i), 3, "%03d", (miniseq[i].GetNote() + 64));
+          gfxPrintfn(6*7 + 1, 25 + (10 * i), 3, "%3d", miniseq[i].GetNote() + 64);
         }
 
         // arrow indicators
@@ -215,7 +201,7 @@ private:
             int seq = SequenceForChannel(ch);
             if (seq >= 0)
             {
-                int x = 28 + (6 * ch);
+                int x = (6*5) - 2 + (6 * ch); 
                 int y = 25 + (10 * seq);
                 if (mode[ch] >= 0)
                 {
