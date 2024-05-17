@@ -55,6 +55,8 @@ public:
       for (int i = 0; i < 4; ++i) {
         miniseq[i].SetPattern(i);
       }
+      Out(0, 0); 
+      Out(1, 0);
     }
 
     void Controller()
